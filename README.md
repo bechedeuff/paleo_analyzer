@@ -7,8 +7,8 @@ A tool for analyzing rolling window correlations between paleoclimate proxies, d
 - **Generic Proxy Support**: Works with any type of paleoclimate proxy data (δ13C, ln(Mn), temperature, precipitation, etc.)
 - **Configuration-Based**: All parameters controlled via configuration file - no interactive prompts
 - **Automatic Column Detection**: Automatically detects proxy names from CSV column headers
-- **Rolling Window Analysis**: Configurable window sizes with Milankovitch cycle defaults
-- **Output**: Generates PDF reports, JSON metadata, and high-quality figures
+- **Rolling Window Analysis**: Configurable window sizes with Milankovitch cycles as default
+- **Output**: Generates PDF reports, JSON metadata, Experiment configuration and figures
 - **Visualizations**: 
   - Time series plots with dual y-axes
   - Rolling correlation with color-coded periods
@@ -99,29 +99,6 @@ results/
 ```python
 # Edit src/configurations.py with your settings
 python main.py
-```
-
-### Custom Configuration
-```python
-import sys
-sys.path.append('src')
-from src import configurations
-from src.rolling_window_analyzer import main
-
-# Modify parameters
-configurations.WINDOW_SIZE = 50
-configurations.THRESHOLD_HIGH = 0.8
-configurations.TEMPORAL_EVOLUTION['x_tick_interval'] = 10
-
-# Run analysis
-main()
-```
-
-### Style Customization
-```python
-# Available styles
-configurations.MATPLOTLIB_STYLE = 'ggplot'  # or 'bmh', 'fivethirtyeight', etc.
-configurations.SEABORN_PALETTE = 'deep'     # or 'muted', 'bright', 'colorblind', etc.
 ```
 
 ## Dependencies
