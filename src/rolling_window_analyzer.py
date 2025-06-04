@@ -1,3 +1,4 @@
+from typing import List, Dict, Optional, Tuple
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,7 +7,6 @@ import seaborn as sns
 from scipy import stats
 from scipy.interpolate import interp1d
 import warnings
-import os
 import json
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
@@ -16,15 +16,16 @@ from reportlab.lib.units import inch
 from reportlab.lib import colors
 
 # Import configurations
-from src.configurations import *
+from . import configurations as config
+from .utils import create_results_directory, save_experiment_config, print_configuration_summary, validate_configurations
 
 warnings.filterwarnings('ignore')
 
 # Apply matplotlib and seaborn styling from configurations
-plt.style.use(MATPLOTLIB_STYLE)
-sns.set_palette(SEABORN_PALETTE)
-plt.rcParams['figure.figsize'] = DEFAULT_FIGURE_SIZE
-plt.rcParams['font.size'] = DEFAULT_FONT_SIZE
+plt.style.use(config.MATPLOTLIB_STYLE)
+sns.set_palette(config.SEABORN_PALETTE)
+plt.rcParams['figure.figsize'] = config.DEFAULT_FIGURE_SIZE
+plt.rcParams['font.size'] = config.DEFAULT_FONT_SIZE
 
 class PaleoclimateCorrelationAnalyzer:
     """
@@ -37,18 +38,18 @@ class PaleoclimateCorrelationAnalyzer:
     - Visualization and analysis of correlation/decoupling periods
     """
     
-    def __init__(self, experiment_dir=None):
-        self.proxy1_data = None
-        self.proxy2_data = None
-        self.proxy1_name = None
-        self.proxy2_name = None
-        self.proxy1_units = None
-        self.proxy2_units = None
-        self.interpolated_data = None
-        self.rolling_correlation = None
-        self.experiment_dir = experiment_dir or 'results'
+    def __init__(self, experiment_dir: Optional[str] = None) -> None:
+        self.proxy1_data: Optional[pd.DataFrame] = None
+        self.proxy2_data: Optional[pd.DataFrame] = None
+        self.proxy1_name: Optional[str] = None
+        self.proxy2_name: Optional[str] = None
+        self.proxy1_units: Optional[str] = None
+        self.proxy2_units: Optional[str] = None
+        self.interpolated_data: Optional[pd.DataFrame] = None
+        self.rolling_correlation: Optional[pd.DataFrame] = None
+        self.experiment_dir: str = experiment_dir or 'results'
         
-    def load_data(self, proxy1_file, proxy2_file):
+    def load_data(self, proxy1_file: str, proxy2_file: str) -> bool:
         """
         Load paleoclimate data from CSV files
         
@@ -106,14 +107,14 @@ class PaleoclimateCorrelationAnalyzer:
         
         return True
     
-    def _clean_and_sort_data(self):
+    def _clean_and_sort_data(self) -> None:
         """
         Remove NaN values and sorts data by age
         """
         self.proxy1_data = self.proxy1_data.dropna().sort_values('age_kyr').reset_index(drop=True)
         self.proxy2_data = self.proxy2_data.dropna().sort_values('age_kyr').reset_index(drop=True)
         
-    def interpolate_to_common_grid(self, resolution=INTERPOLATION_RESOLUTION):
+    def interpolate_to_common_grid(self, resolution: float = config.INTERPOLATION_RESOLUTION) -> None:
         """
         Interpolate both series to a common temporal grid
         
@@ -159,7 +160,7 @@ class PaleoclimateCorrelationAnalyzer:
         print(f"✅ Interpolation completed: {len(self.interpolated_data)} points")
         print(f"   Final range: {self.interpolated_data['age_kyr'].min():.1f} - {self.interpolated_data['age_kyr'].max():.1f} kyr")
         
-    def calculate_rolling_correlation(self, window_size=WINDOW_SIZE, min_periods=MIN_PERIODS):
+    def calculate_rolling_correlation(self, window_size: int = config.WINDOW_SIZE, min_periods: Optional[int] = config.MIN_PERIODS) -> None:
         """
         Calculate rolling correlation between the two proxies
         
@@ -195,7 +196,7 @@ class PaleoclimateCorrelationAnalyzer:
         
         print(f"✅ Rolling correlation calculated: {len(self.rolling_correlation)} points")
         
-    def identify_correlation_periods(self, threshold_high=THRESHOLD_HIGH, threshold_low=THRESHOLD_LOW):
+    def identify_correlation_periods(self, threshold_high: float = config.THRESHOLD_HIGH, threshold_low: float = config.THRESHOLD_LOW) -> Dict[str, pd.DataFrame]:
         """
         Identify and return specific correlation periods
         
@@ -224,7 +225,7 @@ class PaleoclimateCorrelationAnalyzer:
         
         return periods
         
-    def plot_comprehensive_analysis(self, window_size=WINDOW_SIZE, figsize=COMPREHENSIVE_ANALYSIS['figsize']):
+    def plot_comprehensive_analysis(self, window_size: int = config.WINDOW_SIZE, figsize: Tuple[int, int] = config.COMPREHENSIVE_ANALYSIS['figsize']) -> None:
         """
         Create comprehensive visualization with 4 subplots and save to file
         
@@ -358,7 +359,7 @@ class PaleoclimateCorrelationAnalyzer:
         plt.close()
         print(f"✅ Figure saved: {filename}")
         
-    def plot_temporal_evolution(self, window_size=WINDOW_SIZE, figsize=TEMPORAL_EVOLUTION['figsize']):
+    def plot_temporal_evolution(self, window_size: int = config.WINDOW_SIZE, figsize: Tuple[int, int] = config.TEMPORAL_EVOLUTION['figsize']) -> None:
         """
         Plot of temporal evolution with areas colored by period and save to file
         
@@ -421,7 +422,7 @@ class PaleoclimateCorrelationAnalyzer:
         ax2.invert_xaxis()
         
         # Set x-axis ticks using configured interval
-        tick_interval = TEMPORAL_EVOLUTION['x_tick_interval']
+        tick_interval = config.TEMPORAL_EVOLUTION['x_tick_interval']
         min_age = min(ages.min(), self.interpolated_data['age_kyr'].min())
         max_age = max(ages.max(), self.interpolated_data['age_kyr'].max())
         # Round to nearest tick_interval for clean ticks
@@ -441,7 +442,7 @@ class PaleoclimateCorrelationAnalyzer:
         plt.close()
         print(f"✅ Figure saved: {filename}")
         
-    def compare_window_sizes(self, window_sizes=WINDOW_COMPARISON['window_sizes'], figsize=WINDOW_COMPARISON['figsize']):
+    def compare_window_sizes(self, window_sizes: List[int] = config.WINDOW_COMPARISON['window_sizes'], figsize: Tuple[int, int] = config.WINDOW_COMPARISON['figsize']) -> None:
         """
         Compare rolling correlation for 4 different window sizes
         
@@ -464,7 +465,7 @@ class PaleoclimateCorrelationAnalyzer:
         axes = axes.flatten()
         
         # Names of cycles for the titles (from configuration)
-        cycle_names = WINDOW_COMPARISON['cycle_names']
+        cycle_names = config.WINDOW_COMPARISON['cycle_names']
         
         for i, window in enumerate(window_sizes[:4]):  # Maximum 4 windows
             print(f"🔄 Calculating rolling correlation for window of {window} kyr")
@@ -526,7 +527,7 @@ class PaleoclimateCorrelationAnalyzer:
         plt.close()
         print(f"✅ Figure saved: {filename}")
         
-    def export_results(self, filename='rolling_correlation_results.csv'):
+    def export_results(self, filename: str = 'rolling_correlation_results.csv') -> None:
         """
         Export results to CSV file
         
@@ -551,7 +552,7 @@ class PaleoclimateCorrelationAnalyzer:
         export_data.to_csv(full_path, index=False, sep=';', decimal=',')
         print(f"✅ Results exported to: {full_path}")
 
-    def create_pdf_report(self, window_size, periods):
+    def create_pdf_report(self, window_size: int, periods: Dict[str, pd.DataFrame]) -> str:
         """
         Create a well-formatted PDF report
         
@@ -666,8 +667,8 @@ class PaleoclimateCorrelationAnalyzer:
         
         # Main periods by category
         for category, name, color in [('high_positive', 'HIGH POSITIVE CORRELATION', colors.green),
-                                      ('high_negative', 'HIGH NEGATIVE CORRELATION', colors.red),
-                                      ('decoupled', 'DECOUPLING', colors.orange)]:
+                                        ('high_negative', 'HIGH NEGATIVE CORRELATION', colors.red),
+                                        ('decoupled', 'DECOUPLING', colors.orange)]:
             if len(periods[category]) > 0:
                 story.append(Paragraph(f"MAIN PERIODS - {name}", section_style))
                 
@@ -708,7 +709,7 @@ class PaleoclimateCorrelationAnalyzer:
         doc.build(story)
         return pdf_file
 
-    def create_json_metadata(self, window_size, periods):
+    def create_json_metadata(self, window_size: int, periods: Dict[str, pd.DataFrame]) -> str:
         """
         Create a JSON file with structured metadata
         
@@ -805,72 +806,7 @@ class PaleoclimateCorrelationAnalyzer:
         return json_file
 
 
-def create_results_directory():
-    """
-    Create a new experiment directory with sequential numbering
-    Returns the path to the experiment directory
-    """
-    # Ensure main results directory exists
-    os.makedirs('results', exist_ok=True)
-    
-    # Find the next experiment number
-    experiment_num = 1
-    while True:
-        experiment_dir = f'results/experiment_{experiment_num}'
-        if not os.path.exists(experiment_dir):
-            break
-        experiment_num += 1
-    
-    # Create the experiment directory and subdirectories
-    os.makedirs(experiment_dir, exist_ok=True)
-    os.makedirs(f'{experiment_dir}/figures', exist_ok=True)
-    
-    print(f"📁 Created experiment directory: {experiment_dir}")
-    return experiment_dir
-
-
-
-def save_experiment_config(experiment_dir):
-    """
-    Save the current configuration to the experiment directory for reproducibility
-    """
-    config_data = {
-        "experiment_info": {
-            "date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            "configuration_used": "src/configurations.py"
-        },
-        "data_files": {
-            "proxy1_file": PROXY1_FILE,
-            "proxy2_file": PROXY2_FILE
-        },
-        "analysis_parameters": {
-            "window_size": WINDOW_SIZE,
-            "interpolation_resolution": INTERPOLATION_RESOLUTION,
-            "min_periods": MIN_PERIODS,
-            "threshold_high": THRESHOLD_HIGH,
-            "threshold_low": THRESHOLD_LOW
-        },
-        "visualization_settings": {
-            "matplotlib_style": MATPLOTLIB_STYLE,
-            "seaborn_palette": SEABORN_PALETTE,
-            "default_figure_size": DEFAULT_FIGURE_SIZE,
-            "default_font_size": DEFAULT_FONT_SIZE
-        },
-        "plot_configurations": {
-            "comprehensive_analysis": COMPREHENSIVE_ANALYSIS,
-            "temporal_evolution": TEMPORAL_EVOLUTION,
-            "window_comparison": WINDOW_COMPARISON
-        }
-    }
-    
-    config_file = f'{experiment_dir}/experiment_config.json'
-    with open(config_file, 'w', encoding='utf-8') as f:
-        json.dump(config_data, f, indent=2, ensure_ascii=False)
-    
-    print(f"✅ Experiment configuration saved: {config_file}")
-    return config_file
-
-def main():
+def main() -> None:
     """
     Main function using configuration file
     """
@@ -893,8 +829,8 @@ def main():
     
     try:
         # 1. Get file paths from configuration
-        proxy1_file = f'data/{PROXY1_FILE}'
-        proxy2_file = f'data/{PROXY2_FILE}'
+        proxy1_file = f'data/{config.PROXY1_FILE}'
+        proxy2_file = f'data/{config.PROXY2_FILE}'
         
         # 2. Preparation
         print("🔧 PREPARING ANALYSIS...")
@@ -917,7 +853,7 @@ def main():
         analyzer.interpolate_to_common_grid()  # Uses INTERPOLATION_RESOLUTION from config
         
         # 6. Calculation of rolling correlation using configuration
-        print(f"\n📊 CALCULATION OF ROLLING CORRELATION (window: {WINDOW_SIZE} kyr)...")
+        print(f"\n📊 CALCULATION OF ROLLING CORRELATION (window: {config.WINDOW_SIZE} kyr)...")
         analyzer.calculate_rolling_correlation()  # Uses WINDOW_SIZE and MIN_PERIODS from config
         
         # 7. Identification of periods using configuration
@@ -943,11 +879,11 @@ def main():
         analyzer.export_results('rolling_correlation_results.csv')
         
         # PDF report
-        pdf_file = analyzer.create_pdf_report(WINDOW_SIZE, periods)
+        pdf_file = analyzer.create_pdf_report(config.WINDOW_SIZE, periods)
         print(f"✅ PDF report generated: {pdf_file}")
         
         # Metadata in JSON
-        json_file = analyzer.create_json_metadata(WINDOW_SIZE, periods)
+        json_file = analyzer.create_json_metadata(config.WINDOW_SIZE, periods)
         print(f"✅ Metadata JSON generated: {json_file}")
         
         # 10. Final summary
