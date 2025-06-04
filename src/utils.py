@@ -45,6 +45,22 @@ def validate_configurations() -> List[str]:
     if len(config.WINDOW_COMPARISON['window_sizes']) != len(config.WINDOW_COMPARISON['cycle_names']):
         warnings.append(f"⚠️  Number of window_sizes and cycle_names should match")
     
+    # Check spectral analysis parameters
+    if config.MIN_PERIOD <= 0:
+        warnings.append(f"⚠️  MIN_PERIOD should be positive (current: {config.MIN_PERIOD})")
+    
+    if config.MAX_PERIOD <= config.MIN_PERIOD:
+        warnings.append(f"⚠️  MAX_PERIOD should be greater than MIN_PERIOD")
+    
+    if not (0 < config.COHERENCE_THRESHOLD <= 1):
+        warnings.append(f"⚠️  COHERENCE_THRESHOLD should be between 0 and 1 (current: {config.COHERENCE_THRESHOLD})")
+    
+    if not (0 < config.CONFIDENCE_LEVEL < 1):
+        warnings.append(f"⚠️  CONFIDENCE_LEVEL should be between 0 and 1 (current: {config.CONFIDENCE_LEVEL})")
+    
+    if config.WAVELET_PARAM <= 0:
+        warnings.append(f"⚠️  WAVELET_PARAM should be positive (current: {config.WAVELET_PARAM})")
+    
     return warnings
 
 
@@ -54,19 +70,26 @@ def print_configuration_summary() -> None:
     """
     print("\n📋 CONFIGURATION SUMMARY")
     print("=" * 50)
-    print(f"Proxy 1 file: {config.PROXY1_FILE}")
-    print(f"Proxy 2 file: {config.PROXY2_FILE}")
-    print(f"Window size: {config.WINDOW_SIZE} kyr")
-    print(f"Interpolation resolution: {config.INTERPOLATION_RESOLUTION} kyr")
-    print(f"Correlation thresholds: High={config.THRESHOLD_HIGH}, Low={config.THRESHOLD_LOW}")
-    print(f"X-axis tick interval: {config.TEMPORAL_EVOLUTION['x_tick_interval']} kyr")
-    print(f"Window comparison sizes: {config.WINDOW_COMPARISON['window_sizes']} kyr")
+    print("DATA FILES:")
+    print(f"  Proxy 1 file: {config.PROXY1_FILE}")
+    print(f"  Proxy 2 file: {config.PROXY2_FILE}")
+    print("\nROLLING WINDOW ANALYSIS:")
+    print(f"  Window size: {config.WINDOW_SIZE} kyr")
+    print(f"  Interpolation resolution: {config.INTERPOLATION_RESOLUTION} kyr")
+    print(f"  Correlation thresholds: High={config.THRESHOLD_HIGH}, Low={config.THRESHOLD_LOW}")
+    print(f"  Window comparison sizes: {config.WINDOW_COMPARISON['window_sizes']} kyr")
+    print("\nSPECTRAL ANALYSIS:")
+    print(f"  Wavelet type: {config.WAVELET_TYPE} (param={config.WAVELET_PARAM})")
+    print(f"  Period range: {config.MIN_PERIOD} - {config.MAX_PERIOD} kyr")
+    print(f"  Coherence threshold: {config.COHERENCE_THRESHOLD}")
+    print(f"  Confidence level: {config.CONFIDENCE_LEVEL}")
+    print(f"  Milankovitch cycles: {list(config.MILANKOVITCH_CYCLES.keys())}")
     print()
 
 
 def create_results_directory() -> str:
     """
-    Create a new experiment directory with sequential numbering.
+    Create a new experiment directory with sequential numbering and subdirectories for both analyses.
     
     Returns:
     --------
@@ -84,11 +107,23 @@ def create_results_directory() -> str:
             break
         experiment_num += 1
     
-    # Create the experiment directory and subdirectories
+    # Create the experiment directory and subdirectories for both analyses
     os.makedirs(experiment_dir, exist_ok=True)
-    os.makedirs(f'{experiment_dir}/figures', exist_ok=True)
+    
+    # Rolling window analysis subdirectories
+    os.makedirs(f'{experiment_dir}/rolling_window', exist_ok=True)
+    os.makedirs(f'{experiment_dir}/rolling_window/figures', exist_ok=True)
+    
+    # Spectral analysis subdirectories
+    os.makedirs(f'{experiment_dir}/spectral', exist_ok=True)
+    os.makedirs(f'{experiment_dir}/spectral/figures', exist_ok=True)
     
     print(f"📁 Created experiment directory: {experiment_dir}")
+    print(f"   ├── rolling_window/")
+    print(f"   │   └── figures/")
+    print(f"   ├── spectral/")
+    print(f"   │   └── figures/")
+    print(f"   └── experiment_config.json (will be created)")
     return experiment_dir
 
 
@@ -132,6 +167,20 @@ def save_experiment_config(experiment_dir: str) -> str:
             "comprehensive_analysis": config.COMPREHENSIVE_ANALYSIS,
             "temporal_evolution": config.TEMPORAL_EVOLUTION,
             "window_comparison": config.WINDOW_COMPARISON
+        },
+        "spectral_analysis": {
+            "wavelet_type": config.WAVELET_TYPE,
+            "wavelet_param": config.WAVELET_PARAM,
+            "min_period": config.MIN_PERIOD,
+            "max_period": config.MAX_PERIOD,
+            "coherence_threshold": config.COHERENCE_THRESHOLD,
+            "confidence_level": config.CONFIDENCE_LEVEL,
+            "milankovitch_cycles": config.MILANKOVITCH_CYCLES
+        },
+        "spectral_plot_configurations": {
+            "wavelet_power_plot": config.WAVELET_POWER_PLOT,
+            "cross_wavelet_plot": config.CROSS_WAVELET_PLOT,
+            "global_spectrum_plot": config.GLOBAL_SPECTRUM_PLOT
         }
     }
     
