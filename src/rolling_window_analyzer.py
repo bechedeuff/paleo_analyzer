@@ -17,7 +17,7 @@ from reportlab.lib import colors
 
 # Import configurations
 from . import configurations as config
-from .utils import create_results_directory, save_experiment_config, print_configuration_summary, validate_configurations
+from .utils import load_paleoclimate_data
 
 warnings.filterwarnings('ignore')
 
@@ -51,7 +51,7 @@ class PaleoclimateCorrelationAnalyzer:
         
     def load_data(self, proxy1_file: str, proxy2_file: str) -> bool:
         """
-        Load paleoclimate data from CSV files
+        Load paleoclimate data from CSV files using common utility function
         
         Parameters:
         -----------
@@ -60,59 +60,23 @@ class PaleoclimateCorrelationAnalyzer:
         proxy2_file : str
             Path to CSV file of the second proxy
             
-        Expected format of CSVs:
-        - First column: age in kyr
-        - Second column: proxy values
-            
         Returns:
         --------
         bool : True if loading successful, False otherwise
         """
-        print("🔄 Loading paleoclimate data...")
+        success, data = load_paleoclimate_data(proxy1_file, proxy2_file)
         
-        try:
-            # Loading data from the first proxy
-            self.proxy1_data = pd.read_csv(proxy1_file)
-            # Detecting column names automatically
-            original_cols1 = self.proxy1_data.columns.tolist()
-            self.proxy1_name = original_cols1[1] if len(original_cols1) > 1 else 'proxy1'
-            self.proxy1_units = ''  # Can be expanded to detect units
-            
-            # Standardizing column names
-            self.proxy1_data.columns = ['age_kyr', 'proxy1_values']
-            print(f"✅ Data {self.proxy1_name} loaded: {len(self.proxy1_data)} points")
-            
-        except Exception as e:
-            print(f"❌ Error loading first proxy: {e}")
+        if success and data:
+            # Set instance attributes from loaded data
+            self.proxy1_data = data['proxy1_data']
+            self.proxy2_data = data['proxy2_data']
+            self.proxy1_name = data['proxy1_name']
+            self.proxy2_name = data['proxy2_name']
+            self.proxy1_units = data['proxy1_units']
+            self.proxy2_units = data['proxy2_units']
+            return True
+        else:
             return False
-            
-        try:
-            # Loading data from the second proxy
-            self.proxy2_data = pd.read_csv(proxy2_file)
-            # Detecting column names automatically
-            original_cols2 = self.proxy2_data.columns.tolist()
-            self.proxy2_name = original_cols2[1] if len(original_cols2) > 1 else 'proxy2'
-            self.proxy2_units = ''  # Can be expanded to detect units
-            
-            # Standardizing column names
-            self.proxy2_data.columns = ['age_kyr', 'proxy2_values']
-            print(f"✅ Data {self.proxy2_name} loaded: {len(self.proxy2_data)} points")
-            
-        except Exception as e:
-            print(f"❌ Error loading second proxy: {e}")
-            return False
-        
-        # Cleaning and sorting data
-        self._clean_and_sort_data()
-        
-        return True
-    
-    def _clean_and_sort_data(self) -> None:
-        """
-        Remove NaN values and sorts data by age
-        """
-        self.proxy1_data = self.proxy1_data.dropna().sort_values('age_kyr').reset_index(drop=True)
-        self.proxy2_data = self.proxy2_data.dropna().sort_values('age_kyr').reset_index(drop=True)
         
     def interpolate_to_common_grid(self, resolution: float = config.INTERPOLATION_RESOLUTION) -> None:
         """
@@ -806,100 +770,3 @@ class PaleoclimateCorrelationAnalyzer:
         return json_file
 
 
-def main() -> None:
-    """
-    Main function using configuration file
-    """
-    print("🌍 PALEOCLIMATE ROLLING WINDOW CORRELATION ANALYZER")
-    print("=" * 60)
-    print("Analysis of rolling correlation between paleoclimate proxies")
-    print("Identifies periods of coupling and decoupling")
-    print("-" * 60)
-    
-    # Show configuration summary
-    print_configuration_summary()
-    
-    # Validate configurations and show warnings
-    warnings = validate_configurations()
-    if warnings:
-        print("⚠️  CONFIGURATION WARNINGS:")
-        for warning in warnings:
-            print(f"   {warning}")
-        print()
-    
-    try:
-        # 1. Get file paths from configuration
-        proxy1_file = f'data/{config.PROXY1_FILE}'
-        proxy2_file = f'data/{config.PROXY2_FILE}'
-        
-        # 2. Preparation
-        print("🔧 PREPARING ANALYSIS...")
-        experiment_dir = create_results_directory()
-        
-        # Save current configuration for reproducibility
-        save_experiment_config(experiment_dir)
-        
-        # 3. Initialization of the analyzer
-        analyzer = PaleoclimateCorrelationAnalyzer(experiment_dir)
-        
-        # 4. Data loading
-        print("\n📂 LOADING DATA...")
-        if not analyzer.load_data(proxy1_file, proxy2_file):
-            print("❌ Error in data loading!")
-            return
-        
-        # 5. Data processing using configuration
-        print("\n🔧 PROCESSING DATA...")
-        analyzer.interpolate_to_common_grid()  # Uses INTERPOLATION_RESOLUTION from config
-        
-        # 6. Calculation of rolling correlation using configuration
-        print(f"\n📊 CALCULATION OF ROLLING CORRELATION (window: {config.WINDOW_SIZE} kyr)...")
-        analyzer.calculate_rolling_correlation()  # Uses WINDOW_SIZE and MIN_PERIODS from config
-        
-        # 7. Identification of periods using configuration
-        print("\n🔍 IDENTIFICATION OF PERIODS...")
-        periods = analyzer.identify_correlation_periods()  # Uses THRESHOLD_HIGH and THRESHOLD_LOW from config
-        
-        # 8. Generation of visualizations using configuration
-        print("\n📈 GENERATION OF VISUALIZATIONS...")
-        
-        print("   • Complete analysis (4 subplots)...")
-        analyzer.plot_comprehensive_analysis()  # Uses configurations from COMPREHENSIVE_ANALYSIS
-        
-        print("   • Temporal evolution...")
-        analyzer.plot_temporal_evolution()  # Uses configurations from TEMPORAL_EVOLUTION
-        
-        print("   • Comparison of windows...")
-        analyzer.compare_window_sizes()  # Uses configurations from WINDOW_COMPARISON
-        
-        # 9. Exportation of results
-        print("\n💾 EXPORTATION OF RESULTS...")
-        
-        # Main CSV
-        analyzer.export_results('rolling_correlation_results.csv')
-        
-        # PDF report
-        pdf_file = analyzer.create_pdf_report(config.WINDOW_SIZE, periods)
-        print(f"✅ PDF report generated: {pdf_file}")
-        
-        # Metadata in JSON
-        json_file = analyzer.create_json_metadata(config.WINDOW_SIZE, periods)
-        print(f"✅ Metadata JSON generated: {json_file}")
-        
-        # 10. Final summary
-        corr_stats = analyzer.rolling_correlation['rolling_correlation']
-        print(f"\n🏁 ANALYSIS COMPLETED!")
-        print(f"📊 Mean correlation: {corr_stats.mean():.3f} (range: {corr_stats.min():.3f} to {corr_stats.max():.3f})")
-        print(f"🔍 Periods: {len(periods['high_positive'])} pos | {len(periods['high_negative'])} neg | {len(periods['decoupled'])} decoupled")
-        print(f"📁 Results saved in '{experiment_dir}/' (CSV, PDF, JSON and figures)")
-        
-        print(f"\n📝 To modify analysis parameters, edit src/configurations.py")
-        
-    except KeyboardInterrupt:
-        print("\n\n❌ Analysis interrupted by user.")
-    except Exception as e:
-        print(f"\n❌ Error during analysis: {e}")
-
-
-if __name__ == "__main__":
-    main()
