@@ -18,6 +18,7 @@ from pycwt.helpers import find
 
 # Import configurations
 from . import configurations as config
+from .utils import load_paleoclimate_data
 
 warnings.filterwarnings('ignore')
 
@@ -94,7 +95,7 @@ class PaleoclimateSpectralAnalyzer:
         
     def load_data(self, proxy1_file: str, proxy2_file: str) -> bool:
         """
-        Load paleoclimate data from CSV files
+        Load paleoclimate data from CSV files using common utility function
         
         Parameters:
         -----------
@@ -109,47 +110,19 @@ class PaleoclimateSpectralAnalyzer:
         """
         print("🔄 Loading paleoclimate data for spectral analysis...")
         
-        try:
-            # Loading data from the first proxy
-            self.proxy1_data = pd.read_csv(proxy1_file)
-            original_cols1 = self.proxy1_data.columns.tolist()
-            self.proxy1_name = original_cols1[1] if len(original_cols1) > 1 else 'proxy1'
-            self.proxy1_units = ''
-            
-            # Standardizing column names
-            self.proxy1_data.columns = ['age_kyr', 'proxy1_values']
-            print(f"✅ Data {self.proxy1_name} loaded: {len(self.proxy1_data)} points")
-            
-        except Exception as e:
-            print(f"❌ Error loading first proxy: {e}")
-            return False
-            
-        try:
-            # Loading data from the second proxy
-            self.proxy2_data = pd.read_csv(proxy2_file)
-            original_cols2 = self.proxy2_data.columns.tolist()
-            self.proxy2_name = original_cols2[1] if len(original_cols2) > 1 else 'proxy2'
-            self.proxy2_units = ''
-            
-            # Standardizing column names
-            self.proxy2_data.columns = ['age_kyr', 'proxy2_values']
-            print(f"✅ Data {self.proxy2_name} loaded: {len(self.proxy2_data)} points")
-            
-        except Exception as e:
-            print(f"❌ Error loading second proxy: {e}")
-            return False
+        success, data = load_paleoclimate_data(proxy1_file, proxy2_file)
         
-        # Cleaning and sorting data
-        self._clean_and_sort_data()
-        
-        return True
-    
-    def _clean_and_sort_data(self) -> None:
-        """
-        Remove NaN values and sort data by age
-        """
-        self.proxy1_data = self.proxy1_data.dropna().sort_values('age_kyr').reset_index(drop=True)
-        self.proxy2_data = self.proxy2_data.dropna().sort_values('age_kyr').reset_index(drop=True)
+        if success and data:
+            # Set instance attributes from loaded data
+            self.proxy1_data = data['proxy1_data']
+            self.proxy2_data = data['proxy2_data']
+            self.proxy1_name = data['proxy1_name']
+            self.proxy2_name = data['proxy2_name']
+            self.proxy1_units = data['proxy1_units']
+            self.proxy2_units = data['proxy2_units']
+            return True
+        else:
+            return False
         
     def interpolate_to_common_grid(self, resolution: float = config.INTERPOLATION_RESOLUTION) -> None:
         """
@@ -1009,77 +982,3 @@ class PaleoclimateSpectralAnalyzer:
         return json_file
 
 
-def main() -> None:
-    """
-    Main function for spectral analysis using configuration file
-    """
-    print("🌊 PALEOCLIMATE SPECTRAL ANALYSIS")
-    print("=" * 60)
-    print("Wavelet-based spectral analysis of paleoclimate proxies")
-    print("Identification of Milankovitch cycles and coherence patterns")
-    print("-" * 60)
-    
-    try:
-        # Get file paths from configuration
-        proxy1_file = f'data/{config.PROXY1_FILE}'
-        proxy2_file = f'data/{config.PROXY2_FILE}'
-        
-        # Create analyzer instance (experiment_dir will be set by main coordinator)
-        analyzer = PaleoclimateSpectralAnalyzer()
-        
-        # Load data
-        print("\n📂 LOADING DATA...")
-        if not analyzer.load_data(proxy1_file, proxy2_file):
-            print("❌ Error in data loading!")
-            return
-        
-        # Data processing
-        print("\n🔧 PROCESSING DATA...")
-        analyzer.interpolate_to_common_grid()
-        
-        # Wavelet analysis
-        print(f"\n🌊 WAVELET ANALYSIS ({config.WAVELET_TYPE} wavelet)...")
-        analyzer.calculate_wavelet_transform()
-        
-        # Identify cycles
-        print("\n🔍 IDENTIFYING MILANKOVITCH CYCLES...")
-        cycles_found = analyzer.identify_milankovitch_cycles()
-        
-        # Generate visualizations
-        print("\n📈 GENERATING VISUALIZATIONS...")
-        
-        print("   • Comprehensive wavelet analysis...")
-        analyzer.plot_comprehensive_wavelet_analysis(proxy_num=1)
-        analyzer.plot_comprehensive_wavelet_analysis(proxy_num=2)
-        
-        print("   • Cross-wavelet analysis...")
-        analyzer.plot_cross_wavelet_analysis()
-        
-        print("   • Global spectra...")
-        analyzer.plot_global_wavelet_spectra()
-        
-        # Export results
-        print("\n💾 EXPORTING RESULTS...")
-        
-        analyzer.export_results()
-        
-        pdf_file = analyzer.create_pdf_report(cycles_found)
-        print(f"✅ PDF report generated: {pdf_file}")
-        
-        json_file = analyzer.create_json_metadata(cycles_found)
-        print(f"✅ Metadata JSON generated: {json_file}")
-        
-        # Summary
-        total_cycles = sum(len(cycles) for cycles in cycles_found.values())
-        print(f"\n🏁 SPECTRAL ANALYSIS COMPLETED!")
-        print(f"🌊 Wavelet analysis: {len(analyzer.periods)} frequency bands")
-        print(f"🔍 Milankovitch cycles found: {total_cycles}")
-        print(f"🤝 Mean coherence: {np.mean(analyzer.coherence):.3f}")
-        
-    except Exception as e:
-        print(f"❌ Error in spectral analysis: {e}")
-        raise
-
-
-if __name__ == "__main__":
-    main() 
