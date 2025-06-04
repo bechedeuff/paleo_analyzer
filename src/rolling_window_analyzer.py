@@ -551,6 +551,259 @@ class PaleoclimateCorrelationAnalyzer:
         export_data.to_csv(full_path, index=False, sep=';', decimal=',')
         print(f"✅ Results exported to: {full_path}")
 
+    def create_pdf_report(self, window_size, periods):
+        """
+        Create a well-formatted PDF report
+        
+        Parameters:
+        -----------
+        window_size : int
+            Window size used in the analysis
+        periods : dict
+            Dictionary with classified periods
+            
+        Returns:
+        --------
+        str
+            Path to the generated PDF file
+        """
+        # Prepare data
+        corr_stats = self.rolling_correlation['rolling_correlation']
+        analysis_date = datetime.now().strftime('%Y-%m-%d %H:%M')
+        
+        # PDF configuration
+        pdf_file = f'{self.experiment_dir}/correlation_analysis_report.pdf'
+        doc = SimpleDocTemplate(pdf_file, pagesize=A4)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Custom style for title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=30,
+            alignment=1,  # Center
+            textColor=colors.black
+        )
+        
+        # Section style
+        section_style = ParagraphStyle(
+            'SectionHeader',
+            parent=styles['Heading2'],
+            fontSize=12,
+            spaceAfter=12,
+            textColor=colors.black
+        )
+        
+        # Main title
+        story.append(Paragraph("REPORT OF ROLLING WINDOW CORRELATION ANALYSIS", title_style))
+        story.append(Spacer(1, 20))
+        
+        # General information
+        info_data = [
+            ['Analysis date:', analysis_date],
+            ['Proxy 1:', self.proxy1_name],
+            ['Proxy 2:', self.proxy2_name],
+            ['Window used:', f'{window_size} kyr'],
+            ['Analyzed period:', f"{self.interpolated_data['age_kyr'].min():.1f} - {self.interpolated_data['age_kyr'].max():.1f} kyr ago"],
+            ['Total points:', str(len(self.rolling_correlation))]
+        ]
+        
+        info_table = Table(info_data, colWidths=[2*inch, 3*inch])
+        info_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey)
+        ]))
+        story.append(info_table)
+        story.append(Spacer(1, 20))
+        
+        # Statistics
+        story.append(Paragraph("STATISTICS OF CORRELATION", section_style))
+        stats_data = [
+            ['Mean correlation:', f'{corr_stats.mean():.3f}'],
+            ['Median correlation:', f'{corr_stats.median():.3f}'],
+            ['Standard deviation:', f'{corr_stats.std():.3f}'],
+            ['Minimum correlation:', f'{corr_stats.min():.3f}'],
+            ['Maximum correlation:', f'{corr_stats.max():.3f}']
+        ]
+        
+        stats_table = Table(stats_data, colWidths=[2*inch, 1.5*inch])
+        stats_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('BACKGROUND', (0, 0), (0, -1), colors.lightblue)
+        ]))
+        story.append(stats_table)
+        story.append(Spacer(1, 20))
+        
+        # Period count
+        story.append(Paragraph("PERIOD COUNT", section_style))
+        periods_data = [
+            ['High positive correlation (r > 0.7):', f"{len(periods['high_positive'])} periods"],
+            ['High negative correlation (r < -0.7):', f"{len(periods['high_negative'])} periods"],
+            ['Decoupling (|r| < 0.2):', f"{len(periods['decoupled'])} periods"]
+        ]
+        
+        periods_table = Table(periods_data, colWidths=[3*inch, 1.5*inch])
+        periods_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('BACKGROUND', (0, 0), (0, -1), colors.lightgreen)
+        ]))
+        story.append(periods_table)
+        story.append(Spacer(1, 20))
+        
+        # Main periods by category
+        for category, name, color in [('high_positive', 'HIGH POSITIVE CORRELATION', colors.green),
+                                      ('high_negative', 'HIGH NEGATIVE CORRELATION', colors.red),
+                                      ('decoupled', 'DECOUPLING', colors.orange)]:
+            if len(periods[category]) > 0:
+                story.append(Paragraph(f"MAIN PERIODS - {name}", section_style))
+                
+                # Period data (maximum 10)
+                period_data = [['Age (kyr ago)', 'Correlation']]
+                for _, row in periods[category].head(10).iterrows():
+                    period_data.append([f"{row['age_kyr']:.1f}", f"{row['rolling_correlation']:.3f}"])
+                
+                period_table = Table(period_data, colWidths=[1.5*inch, 1.5*inch])
+                period_table.setStyle(TableStyle([
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('BACKGROUND', (0, 0), (-1, 0), color),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige)
+                ]))
+                story.append(period_table)
+                story.append(Spacer(1, 15))
+        
+        # Interpretation
+        story.append(Paragraph("POSSIBLE INTERPRETATIONS", section_style))
+        interpretation_text = f"""
+        <b>• POSITIVE CORRELATION:</b> {self.proxy1_name} and {self.proxy2_name} vary together
+        (synchronized processes)<br/><br/>
+        
+        <b>• NEGATIVE CORRELATION:</b> Variables move in opposite directions
+        (antagonistic or out of phase processes)<br/><br/>
+        
+        <b>• DECOUPLING:</b> Independent evolution of variables
+        (different dominant forcings)
+        """
+        
+        story.append(Paragraph(interpretation_text, styles['Normal']))
+        
+        # Generate PDF
+        doc.build(story)
+        return pdf_file
+
+    def create_json_metadata(self, window_size, periods):
+        """
+        Create a JSON file with structured metadata
+        
+        Parameters:
+        -----------
+        window_size : int
+            Window size used in the analysis
+        periods : dict
+            Dictionary with classified periods
+            
+        Returns:
+        --------
+        str
+            Path to the generated JSON file
+        """
+        corr_stats = self.rolling_correlation['rolling_correlation']
+        
+        # Structured data
+        metadata = {
+            "analysis_info": {
+                "date": datetime.now().strftime('%Y-%m-%d %H:%M'),
+                "proxy1_name": self.proxy1_name,
+                "proxy2_name": self.proxy2_name,
+                "window_size_kyr": window_size,
+                "analysis_period": {
+                    "start_kyr": float(self.interpolated_data['age_kyr'].min()),
+                    "end_kyr": float(self.interpolated_data['age_kyr'].max()),
+                    "duration_kyr": float(self.interpolated_data['age_kyr'].max() - self.interpolated_data['age_kyr'].min())
+                },
+                "total_points": len(self.rolling_correlation)
+            },
+            "data_summary": {
+                "proxy1": {
+                    "name": self.proxy1_name,
+                    "original_points": len(self.proxy1_data),
+                    "age_range": {
+                        "min_kyr": float(self.proxy1_data['age_kyr'].min()),
+                        "max_kyr": float(self.proxy1_data['age_kyr'].max())
+                    },
+                    "value_range": {
+                        "min": float(self.proxy1_data['proxy1_values'].min()),
+                        "max": float(self.proxy1_data['proxy1_values'].max())
+                    }
+                },
+                "proxy2": {
+                    "name": self.proxy2_name,
+                    "original_points": len(self.proxy2_data),
+                    "age_range": {
+                        "min_kyr": float(self.proxy2_data['age_kyr'].min()),
+                        "max_kyr": float(self.proxy2_data['age_kyr'].max())
+                    },
+                    "value_range": {
+                        "min": float(self.proxy2_data['proxy2_values'].min()),
+                        "max": float(self.proxy2_data['proxy2_values'].max())
+                    }
+                }
+            },
+            "correlation_statistics": {
+                "mean": round(float(corr_stats.mean()), 3),
+                "median": round(float(corr_stats.median()), 3),
+                "std": round(float(corr_stats.std()), 3),
+                "min": round(float(corr_stats.min()), 3),
+                "max": round(float(corr_stats.max()), 3),
+                "quantiles": {
+                    "q25": round(float(corr_stats.quantile(0.25)), 3),
+                    "q75": round(float(corr_stats.quantile(0.75)), 3)
+                }
+            },
+            "period_counts": {
+                "high_positive": len(periods['high_positive']),
+                "high_negative": len(periods['high_negative']),
+                "decoupled": len(periods['decoupled'])
+            },
+            "detailed_periods": {}
+        }
+        
+        # Detailed periods
+        for category in ['high_positive', 'high_negative', 'decoupled']:
+            if len(periods[category]) > 0:
+                metadata["detailed_periods"][category] = []
+                for _, row in periods[category].head(20).iterrows():  # Top 20 for JSON
+                    metadata["detailed_periods"][category].append({
+                        "age_kyr": float(row['age_kyr']),
+                        "correlation": float(row['rolling_correlation']),
+                        "proxy1_value": float(row['proxy1_values']),
+                        "proxy2_value": float(row['proxy2_values'])
+                    })
+        
+        # Save JSON
+        json_file = f'{self.experiment_dir}/analysis_metadata.json'
+        with open(json_file, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        
+        return json_file
+
 
 def create_results_directory():
     """
@@ -575,235 +828,7 @@ def create_results_directory():
     print(f"📁 Created experiment directory: {experiment_dir}")
     return experiment_dir
 
-def create_pdf_report(analyzer, window_size, periods, experiment_dir='results'):
-    """
-    Create a well-formatted PDF report
-    """
-    # Prepare data
-    corr_stats = analyzer.rolling_correlation['rolling_correlation']
-    analysis_date = datetime.now().strftime('%Y-%m-%d %H:%M')
-    
-    # PDF configuration
-    pdf_file = f'{experiment_dir}/correlation_analysis_report.pdf'
-    doc = SimpleDocTemplate(pdf_file, pagesize=A4)
-    styles = getSampleStyleSheet()
-    story = []
-    
-    # Custom style for title
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=16,
-        spaceAfter=30,
-        alignment=1,  # Center
-        textColor=colors.black
-    )
-    
-    # Section style
-    section_style = ParagraphStyle(
-        'SectionHeader',
-        parent=styles['Heading2'],
-        fontSize=12,
-        spaceAfter=12,
-        textColor=colors.black
-    )
-    
-    # Main title
-    story.append(Paragraph("REPORT OF ROLLING WINDOW CORRELATION ANALYSIS", title_style))
-    story.append(Spacer(1, 20))
-    
-    # General information
-    info_data = [
-        ['Analysis date:', analysis_date],
-        ['Proxy 1:', analyzer.proxy1_name],
-        ['Proxy 2:', analyzer.proxy2_name],
-        ['Window used:', f'{window_size} kyr'],
-        ['Analyzed period:', f"{analyzer.interpolated_data['age_kyr'].min():.1f} - {analyzer.interpolated_data['age_kyr'].max():.1f} kyr ago"],
-        ['Total points:', str(len(analyzer.rolling_correlation))]
-    ]
-    
-    info_table = Table(info_data, colWidths=[2*inch, 3*inch])
-    info_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey)
-    ]))
-    story.append(info_table)
-    story.append(Spacer(1, 20))
-    
-    # Statistics
-    story.append(Paragraph("STATISTICS OF CORRELATION", section_style))
-    stats_data = [
-        ['Mean correlation:', f'{corr_stats.mean():.3f}'],
-        ['Median correlation:', f'{corr_stats.median():.3f}'],
-        ['Standard deviation:', f'{corr_stats.std():.3f}'],
-        ['Minimum correlation:', f'{corr_stats.min():.3f}'],
-        ['Maximum correlation:', f'{corr_stats.max():.3f}']
-    ]
-    
-    stats_table = Table(stats_data, colWidths=[2*inch, 1.5*inch])
-    stats_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('BACKGROUND', (0, 0), (0, -1), colors.lightblue)
-    ]))
-    story.append(stats_table)
-    story.append(Spacer(1, 20))
-    
-    # Period count
-    story.append(Paragraph("PERIOD COUNT", section_style))
-    periods_data = [
-        ['High positive correlation (r > 0.7):', f"{len(periods['high_positive'])} periods"],
-        ['High negative correlation (r < -0.7):', f"{len(periods['high_negative'])} periods"],
-        ['Decoupling (|r| < 0.2):', f"{len(periods['decoupled'])} periods"]
-    ]
-    
-    periods_table = Table(periods_data, colWidths=[3*inch, 1.5*inch])
-    periods_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('BACKGROUND', (0, 0), (0, -1), colors.lightgreen)
-    ]))
-    story.append(periods_table)
-    story.append(Spacer(1, 20))
-    
-    # Main periods by category
-    for category, name, color in [('high_positive', 'HIGH POSITIVE CORRELATION', colors.green),
-                                  ('high_negative', 'HIGH NEGATIVE CORRELATION', colors.red),
-                                  ('decoupled', 'DECOUPLING', colors.orange)]:
-        if len(periods[category]) > 0:
-            story.append(Paragraph(f"MAIN PERIODS - {name}", section_style))
-            
-            # Period data (maximum 10)
-            period_data = [['Age (kyr ago)', 'Correlation']]
-            for _, row in periods[category].head(10).iterrows():
-                period_data.append([f"{row['age_kyr']:.1f}", f"{row['rolling_correlation']:.3f}"])
-            
-            period_table = Table(period_data, colWidths=[1.5*inch, 1.5*inch])
-            period_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('BACKGROUND', (0, 0), (-1, 0), color),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige)
-            ]))
-            story.append(period_table)
-            story.append(Spacer(1, 15))
-    
-    # Interpretation
-    story.append(Paragraph("POSSIBLE INTERPRETATIONS", section_style))
-    interpretation_text = f"""
-    <b>• POSITIVE CORRELATION:</b> {analyzer.proxy1_name} and {analyzer.proxy2_name} vary together
-    (synchronized processes)<br/><br/>
-    
-    <b>• NEGATIVE CORRELATION:</b> Variables move in opposite directions
-    (antagonistic or out of phase processes)<br/><br/>
-    
-    <b>• DECOUPLING:</b> Independent evolution of variables
-    (different dominant forcings)
-    """
-    
-    story.append(Paragraph(interpretation_text, styles['Normal']))
-    
-    # Generate PDF
-    doc.build(story)
-    return pdf_file
 
-
-def create_json_metadata(analyzer, window_size, periods, experiment_dir='results'):
-    """
-    Create a JSON file with structured metadata
-    """
-    corr_stats = analyzer.rolling_correlation['rolling_correlation']
-    
-    # Structured data
-    metadata = {
-        "analysis_info": {
-            "date": datetime.now().strftime('%Y-%m-%d %H:%M'),
-            "proxy1_name": analyzer.proxy1_name,
-            "proxy2_name": analyzer.proxy2_name,
-            "window_size_kyr": window_size,
-            "analysis_period": {
-                "start_kyr": float(analyzer.interpolated_data['age_kyr'].min()),
-                "end_kyr": float(analyzer.interpolated_data['age_kyr'].max()),
-                "duration_kyr": float(analyzer.interpolated_data['age_kyr'].max() - analyzer.interpolated_data['age_kyr'].min())
-            },
-            "total_points": len(analyzer.rolling_correlation)
-        },
-        "data_summary": {
-            "proxy1": {
-                "name": analyzer.proxy1_name,
-                "original_points": len(analyzer.proxy1_data),
-                "age_range": {
-                    "min_kyr": float(analyzer.proxy1_data['age_kyr'].min()),
-                    "max_kyr": float(analyzer.proxy1_data['age_kyr'].max())
-                },
-                "value_range": {
-                    "min": float(analyzer.proxy1_data['proxy1_values'].min()),
-                    "max": float(analyzer.proxy1_data['proxy1_values'].max())
-                }
-            },
-            "proxy2": {
-                "name": analyzer.proxy2_name,
-                "original_points": len(analyzer.proxy2_data),
-                "age_range": {
-                    "min_kyr": float(analyzer.proxy2_data['age_kyr'].min()),
-                    "max_kyr": float(analyzer.proxy2_data['age_kyr'].max())
-                },
-                "value_range": {
-                    "min": float(analyzer.proxy2_data['proxy2_values'].min()),
-                    "max": float(analyzer.proxy2_data['proxy2_values'].max())
-                }
-            }
-        },
-        "correlation_statistics": {
-            "mean": round(float(corr_stats.mean()), 3),
-            "median": round(float(corr_stats.median()), 3),
-            "std": round(float(corr_stats.std()), 3),
-            "min": round(float(corr_stats.min()), 3),
-            "max": round(float(corr_stats.max()), 3),
-            "quantiles": {
-                "q25": round(float(corr_stats.quantile(0.25)), 3),
-                "q75": round(float(corr_stats.quantile(0.75)), 3)
-            }
-        },
-        "period_counts": {
-            "high_positive": len(periods['high_positive']),
-            "high_negative": len(periods['high_negative']),
-            "decoupled": len(periods['decoupled'])
-        },
-        "detailed_periods": {}
-    }
-    
-    # Detailed periods
-    for category in ['high_positive', 'high_negative', 'decoupled']:
-        if len(periods[category]) > 0:
-            metadata["detailed_periods"][category] = []
-            for _, row in periods[category].head(20).iterrows():  # Top 20 for JSON
-                metadata["detailed_periods"][category].append({
-                    "age_kyr": float(row['age_kyr']),
-                    "correlation": float(row['rolling_correlation']),
-                    "proxy1_value": float(row['proxy1_values']),
-                    "proxy2_value": float(row['proxy2_values'])
-                })
-    
-    # Save JSON
-    json_file = f'{experiment_dir}/analysis_metadata.json'
-    with open(json_file, 'w', encoding='utf-8') as f:
-        json.dump(metadata, f, indent=2, ensure_ascii=False)
-    
-    return json_file
 
 def save_experiment_config(experiment_dir):
     """
@@ -918,11 +943,11 @@ def main():
         analyzer.export_results('rolling_correlation_results.csv')
         
         # PDF report
-        pdf_file = create_pdf_report(analyzer, WINDOW_SIZE, periods, experiment_dir)
+        pdf_file = analyzer.create_pdf_report(WINDOW_SIZE, periods)
         print(f"✅ PDF report generated: {pdf_file}")
         
         # Metadata in JSON
-        json_file = create_json_metadata(analyzer, WINDOW_SIZE, periods, experiment_dir)
+        json_file = analyzer.create_json_metadata(WINDOW_SIZE, periods)
         print(f"✅ Metadata JSON generated: {json_file}")
         
         # 10. Final summary
