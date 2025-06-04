@@ -1,6 +1,7 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple, Optional
 import os
 import json
+import pandas as pd
 from datetime import datetime
 
 # Import configurations
@@ -190,3 +191,73 @@ def save_experiment_config(experiment_dir: str) -> str:
     
     print(f"✅ Experiment configuration saved: {config_file}")
     return config_file
+
+
+def load_paleoclimate_data(proxy1_file: str, proxy2_file: str) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    """
+    Load and clean paleoclimate data from CSV files
+    
+    Parameters:
+    -----------
+    proxy1_file : str
+        Path to CSV file of the first proxy
+    proxy2_file : str
+        Path to CSV file of the second proxy
+        
+    Expected format of CSVs:
+    - First column: age in kyr
+    - Second column: proxy values
+        
+    Returns:
+    --------
+    tuple : (success: bool, data: dict or None)
+        - success: True if loading successful, False otherwise
+        - data: Dictionary with loaded data if successful, None otherwise
+    """
+    print("🔄 Loading paleoclimate data...")
+    
+    data = {}
+    
+    try:
+        # Loading data from the first proxy
+        proxy1_data = pd.read_csv(proxy1_file)
+        # Detecting column names automatically
+        original_cols1 = proxy1_data.columns.tolist()
+        proxy1_name = original_cols1[1] if len(original_cols1) > 1 else 'proxy1'
+        
+        # Standardizing column names
+        proxy1_data.columns = ['age_kyr', 'proxy1_values']
+        print(f"✅ Data {proxy1_name} loaded: {len(proxy1_data)} points")
+        
+        data['proxy1_data'] = proxy1_data
+        data['proxy1_name'] = proxy1_name
+        data['proxy1_units'] = ''  # Can be expanded to detect units
+        
+    except Exception as e:
+        print(f"❌ Error loading first proxy: {e}")
+        return False, None
+        
+    try:
+        # Loading data from the second proxy
+        proxy2_data = pd.read_csv(proxy2_file)
+        # Detecting column names automatically
+        original_cols2 = proxy2_data.columns.tolist()
+        proxy2_name = original_cols2[1] if len(original_cols2) > 1 else 'proxy2'
+        
+        # Standardizing column names
+        proxy2_data.columns = ['age_kyr', 'proxy2_values']
+        print(f"✅ Data {proxy2_name} loaded: {len(proxy2_data)} points")
+        
+        data['proxy2_data'] = proxy2_data
+        data['proxy2_name'] = proxy2_name
+        data['proxy2_units'] = ''  # Can be expanded to detect units
+        
+    except Exception as e:
+        print(f"❌ Error loading second proxy: {e}")
+        return False, None
+    
+    # Clean and sort data
+    data['proxy1_data'] = data['proxy1_data'].dropna().sort_values('age_kyr').reset_index(drop=True)
+    data['proxy2_data'] = data['proxy2_data'].dropna().sort_values('age_kyr').reset_index(drop=True)
+    
+    return True, data
