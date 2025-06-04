@@ -355,7 +355,7 @@ class PaleoclimateCorrelationAnalyzer:
         
         # Save figure
         filename = f'{self.experiment_dir}/figures/comprehensive_analysis_window_{window_size}kyrs.png'
-        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        plt.savefig(filename, dpi=config.DEFAULT_DPI, bbox_inches='tight')
         plt.close()
         print(f"✅ Figure saved: {filename}")
         
@@ -438,7 +438,7 @@ class PaleoclimateCorrelationAnalyzer:
         
         # Save figure
         filename = f'{self.experiment_dir}/figures/temporal_evolution_window_{window_size}kyrs.png'
-        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        plt.savefig(filename, dpi=config.DEFAULT_DPI, bbox_inches='tight')
         plt.close()
         print(f"✅ Figure saved: {filename}")
         
@@ -523,7 +523,7 @@ class PaleoclimateCorrelationAnalyzer:
         
         # Save figure
         filename = f'{self.experiment_dir}/figures/windows_comparison.png'
-        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        plt.savefig(filename, dpi=config.DEFAULT_DPI, bbox_inches='tight')
         plt.close()
         print(f"✅ Figure saved: {filename}")
         
