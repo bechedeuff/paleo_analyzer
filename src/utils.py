@@ -2,11 +2,12 @@ from typing import List, Dict, Any, Tuple, Optional
 import os
 import json
 import pandas as pd
+import numpy as np
 from datetime import datetime
+from scipy.interpolate import interp1d
 
 # Import configurations
 from . import configurations as config
-
 
 def validate_configurations() -> List[str]:
     """
@@ -64,7 +65,6 @@ def validate_configurations() -> List[str]:
     
     return warnings
 
-
 def print_configuration_summary() -> None:
     """
     Print a summary of current configurations.
@@ -93,7 +93,6 @@ def print_configuration_summary() -> None:
     print(f"  Correlation types: {config.LEADLAG_ANALYSIS['correlation_types']}")
     print(f"  Bootstrap iterations: {config.LEADLAG_ANALYSIS['bootstrap_iterations']}")
     print()
-
 
 def create_results_directory() -> str:
     """
@@ -140,7 +139,6 @@ def create_results_directory() -> str:
     print(f"   └── experiment_config.json (will be created)")
     return experiment_dir
 
-
 def save_experiment_config(experiment_dir: str) -> str:
     """
     Save the current configuration to the experiment directory for reproducibility.
@@ -184,7 +182,6 @@ def save_experiment_config(experiment_dir: str) -> str:
     
     print(f"✅ Experiment configuration saved: {config_file}")
     return config_file
-
 
 def load_paleoclimate_data(proxy1_file: str, proxy2_file: str) -> Tuple[bool, Optional[Dict[str, Any]]]:
     """
@@ -254,3 +251,180 @@ def load_paleoclimate_data(proxy1_file: str, proxy2_file: str) -> Tuple[bool, Op
     data['proxy2_data'] = data['proxy2_data'].dropna().sort_values('age_kyr').reset_index(drop=True)
     
     return True, data
+
+def interpolate_to_common_grid(proxy1_data: pd.DataFrame, proxy2_data: pd.DataFrame, 
+                                resolution: float = config.INTERPOLATION_RESOLUTION) -> pd.DataFrame:
+    """
+    Interpolate both series to a common temporal grid
+    
+    Parameters:
+    -----------
+    proxy1_data : pd.DataFrame
+        First proxy data with columns 'age_kyr' and 'proxy1_values'
+    proxy2_data : pd.DataFrame
+        Second proxy data with columns 'age_kyr' and 'proxy2_values'
+    resolution : float
+        Temporal resolution in kyr (default: 1.0)
+        
+    Returns:
+    --------
+    pd.DataFrame
+        DataFrame with interpolated data on common grid
+    """
+    print(f"\n🔄 Interpolating to common grid (resolution: {resolution} kyr)...")
+    
+    # Defining common temporal range (overlap)
+    min_age = max(proxy1_data['age_kyr'].min(), proxy2_data['age_kyr'].min())
+    max_age = min(proxy1_data['age_kyr'].max(), proxy2_data['age_kyr'].max())
+    
+    # Creating uniform temporal grid
+    common_ages = np.arange(min_age, max_age + resolution, resolution)
+    
+    # Linear interpolation for 1st proxy
+    interp_proxy1 = interp1d(
+        proxy1_data['age_kyr'], 
+        proxy1_data['proxy1_values'],
+        kind='linear',
+        bounds_error=False,
+        fill_value=np.nan
+    )
+    
+    # Linear interpolation for the 2nd proxy
+    interp_proxy2 = interp1d(
+        proxy2_data['age_kyr'],
+        proxy2_data['proxy2_values'],
+        kind='linear',
+        bounds_error=False,
+        fill_value=np.nan
+    )
+    
+    # Creating DF with interpolated data
+    interpolated_data = pd.DataFrame({
+        'age_kyr': common_ages,
+        'proxy1_values': interp_proxy1(common_ages),
+        'proxy2_values': interp_proxy2(common_ages)
+    }).dropna().reset_index(drop=True)
+    
+    print(f"✅ Interpolation completed: {len(interpolated_data)} points")
+    print(f"   Final range: {interpolated_data['age_kyr'].min():.1f} - {interpolated_data['age_kyr'].max():.1f} kyr")
+    
+    return interpolated_data
+
+def export_rolling_window_results(rolling_correlation: pd.DataFrame, proxy1_name: str, proxy2_name: str,
+                                    experiment_dir: str, filename: str = 'rolling_correlation_results.csv') -> None:
+    """
+    Export rolling window correlation results to CSV file
+    
+    Parameters:
+    -----------
+    rolling_correlation : pd.DataFrame
+        Rolling correlation results
+    proxy1_name : str
+        Name of first proxy
+    proxy2_name : str
+        Name of second proxy
+    experiment_dir : str
+        Experiment directory path
+    filename : str
+        Name of the file to export
+    """
+    # Create full path with experiment directory
+    full_path = f'{experiment_dir}/{filename}'
+        
+    # Create export DataFrame with original column names
+    export_data = rolling_correlation.copy()
+    export_data = export_data.rename(columns={
+        'proxy1_values': proxy1_name,
+        'proxy2_values': proxy2_name
+    })
+    
+    export_data.to_csv(full_path, index=False, sep=';', decimal=',')
+    print(f"✅ Results exported to: {full_path}")
+
+def export_spectral_results(cwt1_power: np.ndarray, cwt2_power: np.ndarray, coherence: np.ndarray,
+                            periods: np.ndarray, freqs: np.ndarray, proxy1_name: str, proxy2_name: str,
+                            experiment_dir: str, filename: str = 'spectral_analysis_results.csv') -> None:
+    """
+    Export spectral analysis results to CSV file
+    
+    Parameters:
+    -----------
+    cwt1_power : np.ndarray
+        CWT power for proxy 1
+    cwt2_power : np.ndarray
+        CWT power for proxy 2
+    coherence : np.ndarray
+        Wavelet coherence
+    periods : np.ndarray
+        Periods array
+    freqs : np.ndarray
+        Frequencies array
+    proxy1_name : str
+        Name of first proxy
+    proxy2_name : str
+        Name of second proxy
+    experiment_dir : str
+        Experiment directory path
+    filename : str
+        Name of the file to export
+    """
+    # Create full path with experiment directory
+    full_path = f'{experiment_dir}/{filename}'
+    
+    # Calculate global spectra and coherence
+    global_power1 = np.var(cwt1_power, axis=1)
+    global_power2 = np.var(cwt2_power, axis=1)
+    global_coherence = np.mean(coherence, axis=1)
+    
+    # Create export DataFrame
+    export_data = pd.DataFrame({
+        'period_kyr': periods.round(3),
+        'frequency_1_per_kyr': freqs.round(3),
+        f'{proxy1_name}_global_power': global_power1.round(3),
+        f'{proxy2_name}_global_power': global_power2.round(3),
+        'global_coherence': global_coherence.round(3),
+        'significant_coherence': (global_coherence > config.SPECTRAL_ANALYSIS['coherence_threshold']).astype(int)
+    })
+    
+    export_data.to_csv(full_path, index=False, sep=';', decimal=',')
+    print(f"✅ Spectral results exported to: {full_path}")
+
+def export_leadlag_results(leadlag_results: Dict[str, Any], experiment_dir: str, 
+                            filename: str = 'leadlag_analysis_results.csv') -> None:
+    """
+    Export lead-lag analysis results to CSV file
+    
+    Parameters:
+    -----------
+    leadlag_results : dict
+        Lead-lag analysis results
+    experiment_dir : str
+        Experiment directory path
+    filename : str
+        Name of the file to export
+    """
+    # Create full path with experiment directory
+    full_path = f'{experiment_dir}/{filename}'
+    
+    # Export cross-correlation results if available
+    if 'cross_correlation' in leadlag_results['detailed_results']:
+        cross_corr_data = leadlag_results['detailed_results']['cross_correlation']
+        
+        # Create export DataFrame
+        export_data = []
+        for corr_type, data in cross_corr_data.items():
+            lags = data['lags_kyr']
+            correlations = data['correlations']
+            
+            for lag, corr in zip(lags, correlations):
+                export_data.append({
+                    'lag_kyr': lag,
+                    'correlation_type': corr_type,
+                    'correlation_value': round(float(corr), 3)
+                })
+        
+        export_df = pd.DataFrame(export_data)
+        export_df.to_csv(full_path, index=False, sep=';', decimal=',')
+        print(f"✅ Results exported to: {full_path}")
+    else:
+        print("⚠️ No cross-correlation data available for export")
