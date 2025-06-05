@@ -3,22 +3,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.interpolate import interp1d
+
 import warnings
-import json
-from datetime import datetime
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib import colors
 from scipy.ndimage import uniform_filter
 import pycwt as wavelet
 from pycwt.helpers import find
 
 # Import configurations
 from . import configurations as config
-from .utils import load_paleoclimate_data
 
 warnings.filterwarnings('ignore')
 
@@ -92,83 +84,6 @@ class PaleoclimateSpectralAnalyzer:
         self.global_power2: Optional[np.ndarray] = None
         
         self.experiment_dir: str = experiment_dir or 'results'
-        
-    def load_data(self, proxy1_file: str, proxy2_file: str) -> bool:
-        """
-        Load paleoclimate data from CSV files using common utility function
-        
-        Parameters:
-        -----------
-        proxy1_file : str
-            Path to CSV file of the first proxy
-        proxy2_file : str
-            Path to CSV file of the second proxy
-            
-        Returns:
-        --------
-        bool : True if loading successful, False otherwise
-        """
-        print("🔄 Loading paleoclimate data for spectral analysis...")
-        
-        success, data = load_paleoclimate_data(proxy1_file, proxy2_file)
-        
-        if success and data:
-            # Set instance attributes from loaded data
-            self.proxy1_data = data['proxy1_data']
-            self.proxy2_data = data['proxy2_data']
-            self.proxy1_name = data['proxy1_name']
-            self.proxy2_name = data['proxy2_name']
-            self.proxy1_units = data['proxy1_units']
-            self.proxy2_units = data['proxy2_units']
-            return True
-        else:
-            return False
-        
-    def interpolate_to_common_grid(self, resolution: float = config.INTERPOLATION_RESOLUTION) -> None:
-        """
-        Interpolate both series to a common temporal grid
-        
-        Parameters:
-        -----------
-        resolution : float
-            Temporal resolution in kyr (default from config)
-        """
-        print(f"\n🔄 Interpolating to common grid for spectral analysis (resolution: {resolution} kyr)...")
-        
-        # Defining common temporal range (overlap)
-        min_age = max(self.proxy1_data['age_kyr'].min(), self.proxy2_data['age_kyr'].min())
-        max_age = min(self.proxy1_data['age_kyr'].max(), self.proxy2_data['age_kyr'].max())
-        
-        # Creating uniform temporal grid
-        common_ages = np.arange(min_age, max_age + resolution, resolution)
-        
-        # Linear interpolation for 1st proxy
-        interp_proxy1 = interp1d(
-            self.proxy1_data['age_kyr'], 
-            self.proxy1_data['proxy1_values'],
-            kind='linear',
-            bounds_error=False,
-            fill_value=np.nan
-        )
-        
-        # Linear interpolation for the 2nd proxy
-        interp_proxy2 = interp1d(
-            self.proxy2_data['age_kyr'],
-            self.proxy2_data['proxy2_values'],
-            kind='linear',
-            bounds_error=False,
-            fill_value=np.nan
-        )
-        
-        # Creating DF with interpolated data
-        self.interpolated_data = pd.DataFrame({
-            'age_kyr': common_ages,
-            'proxy1_values': interp_proxy1(common_ages),
-            'proxy2_values': interp_proxy2(common_ages)
-        }).dropna().reset_index(drop=True)
-        
-        print(f"✅ Interpolation completed: {len(self.interpolated_data)} points")
-        print(f"   Final range: {self.interpolated_data['age_kyr'].min():.1f} - {self.interpolated_data['age_kyr'].max():.1f} kyr")
         
     def calculate_wavelet_transform(self, wavelet_type: str = config.SPECTRAL_ANALYSIS['wavelet_type'], 
                                     wavelet_param: float = config.SPECTRAL_ANALYSIS['wavelet_param']) -> None:
@@ -764,139 +679,6 @@ class PaleoclimateSpectralAnalyzer:
         plt.close()
         print(f"✅ Global wavelet spectra saved: {filename}")
         
-    def export_results(self, filename: str = 'spectral_analysis_results.csv') -> None:
-        """
-        Export spectral analysis results to CSV file
-        
-        Parameters:
-        -----------
-        filename : str
-            Name of the file to export
-        """
-        if self.cwt1_power is None:
-            raise ValueError("Execute calculate_wavelet_transform() first!")
-            
-        # Create full path with experiment directory
-        full_path = f'{self.experiment_dir}/{filename}'
-        
-        # Calculate global spectra and coherence
-        global_power1 = np.var(self.cwt1_power, axis=1)
-        global_power2 = np.var(self.cwt2_power, axis=1)
-        global_coherence = np.mean(self.coherence, axis=1)
-        
-        # Create export DataFrame
-        export_data = pd.DataFrame({
-            'period_kyr': self.periods.round(3),
-            'frequency_1_per_kyr': self.freqs.round(3),
-            f'{self.proxy1_name}_global_power': global_power1.round(3),
-            f'{self.proxy2_name}_global_power': global_power2.round(3),
-            'global_coherence': global_coherence.round(3),
-            'significant_coherence': (global_coherence > config.SPECTRAL_ANALYSIS['coherence_threshold']).astype(int)
-        })
-        
-        export_data.to_csv(full_path, index=False, sep=';', decimal=',')
-        print(f"✅ Spectral results exported to: {full_path}")
-        
-    def create_pdf_report(self, cycles_found: Dict[str, List[Tuple[float, float]]]) -> str:
-        """
-        Create a comprehensive PDF report for spectral analysis
-        
-        Parameters:
-        -----------
-        cycles_found : dict
-            Dictionary with identified cycles
-            
-        Returns:
-        --------
-        str
-            Path to the generated PDF file
-        """
-        # Prepare data
-        analysis_date = datetime.now().strftime('%Y-%m-%d %H:%M')
-        
-        # PDF configuration
-        pdf_file = f'{self.experiment_dir}/spectral_analysis_report.pdf'
-        doc = SimpleDocTemplate(pdf_file, pagesize=A4)
-        styles = getSampleStyleSheet()
-        story = []
-        
-        # Custom styles
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            spaceAfter=30,
-            alignment=1,
-            textColor=colors.black
-        )
-        
-        section_style = ParagraphStyle(
-            'SectionHeader',
-            parent=styles['Heading2'],
-            fontSize=12,
-            spaceAfter=12,
-            textColor=colors.black
-        )
-        
-        # Main title
-        story.append(Paragraph("SPECTRAL ANALYSIS REPORT - PALEOCLIMATE DATA", title_style))
-        story.append(Spacer(1, 20))
-        
-        # General information
-        info_data = [
-            ['Analysis date:', analysis_date],
-            ['Proxy 1:', self.proxy1_name],
-            ['Proxy 2:', self.proxy2_name],
-            ['Wavelet type:', config.SPECTRAL_ANALYSIS['wavelet_type']],
-            ['Period range:', f"{self.periods.min():.1f} - {self.periods.max():.1f} kyr"],
-            ['Coherence threshold:', str(config.SPECTRAL_ANALYSIS['coherence_threshold'])],
-            ['Total time points:', str(len(self.interpolated_data))]
-        ]
-        
-        info_table = Table(info_data, colWidths=[2*inch, 3*inch])
-        info_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey)
-        ]))
-        story.append(info_table)
-        story.append(Spacer(1, 20))
-        
-        # Milankovitch cycles found
-        story.append(Paragraph("IDENTIFIED MILANKOVITCH CYCLES", section_style))
-        
-        cycle_data = [['Cycle Type', 'Period (kyr)', 'Power', 'Proxy']]
-        
-        for proxy_name, cycles in cycles_found.items():
-            for period, power in cycles:
-                cycle_data.append([
-                    self._get_cycle_name(period),
-                    f'{period:.1f}',
-                    f'{power:.3f}',
-                    proxy_name
-                ])
-        
-        if len(cycle_data) > 1:
-            cycle_table = Table(cycle_data, colWidths=[1.5*inch, 1*inch, 1*inch, 1.5*inch])
-            cycle_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey)
-            ]))
-            story.append(cycle_table)
-        else:
-            story.append(Paragraph("No significant Milankovitch cycles identified.", styles['Normal']))
-        
-        # Build PDF
-        doc.build(story)
-        
-        return pdf_file
-        
     def _get_cycle_name(self, period: float) -> str:
         """
         Get the name of Milankovitch cycle based on period
@@ -906,79 +688,3 @@ class PaleoclimateSpectralAnalyzer:
                 if abs(period - target_period) / target_period < 0.2:
                     return cycle_name.replace('_', ' ').title()
         return 'Unknown'
-        
-    def create_json_metadata(self, cycles_found: Dict[str, List[Tuple[float, float]]]) -> str:
-        """
-        Create a JSON file with spectral analysis metadata
-        
-        Parameters:
-        -----------
-        cycles_found : dict
-            Dictionary with identified cycles
-            
-        Returns:
-        --------
-        str
-            Path to the generated JSON file
-        """
-        # Calculate global spectra
-        global_power1 = np.var(self.cwt1_power, axis=1)
-        global_power2 = np.var(self.cwt2_power, axis=1)
-        global_coherence = np.mean(self.coherence, axis=1)
-        
-        # Structured metadata
-        metadata = {
-            "analysis_info": {
-                "date": datetime.now().strftime('%Y-%m-%d %H:%M'),
-                "analysis_type": "spectral_wavelet",
-                "proxy1_name": self.proxy1_name,
-                "proxy2_name": self.proxy2_name,
-                "wavelet_type": config.SPECTRAL_ANALYSIS['wavelet_type'],
-                "wavelet_parameter": config.SPECTRAL_ANALYSIS['wavelet_param'],
-                "analysis_period": {
-                    "start_kyr": float(self.interpolated_data['age_kyr'].min()),
-                    "end_kyr": float(self.interpolated_data['age_kyr'].max()),
-                    "duration_kyr": float(self.interpolated_data['age_kyr'].max() - self.interpolated_data['age_kyr'].min())
-                },
-                "frequency_resolution": len(self.periods),
-                "period_range": {
-                    "min_kyr": round(float(self.periods.min()), 3),
-                    "max_kyr": round(float(self.periods.max()), 3)
-                }
-            },
-            "spectral_statistics": {
-                "proxy1_total_power": round(float(np.sum(global_power1)), 3),
-                "proxy2_total_power": round(float(np.sum(global_power2)), 3),
-                "mean_coherence": round(float(np.mean(global_coherence)), 3),
-                "max_coherence": round(float(np.max(global_coherence)), 3),
-                "coherent_frequencies": int(np.sum(global_coherence > config.SPECTRAL_ANALYSIS['coherence_threshold']))
-            },
-            "milankovitch_cycles": {},
-            "configuration_used": {
-                "wavelet_type": config.SPECTRAL_ANALYSIS['wavelet_type'],
-                "wavelet_param": config.SPECTRAL_ANALYSIS['wavelet_param'],
-                "min_period": config.SPECTRAL_ANALYSIS['min_period'],
-                "max_period": config.SPECTRAL_ANALYSIS['max_period'],
-                "coherence_threshold": config.SPECTRAL_ANALYSIS['coherence_threshold'],
-                "confidence_level": config.SPECTRAL_ANALYSIS['confidence_level']
-            }
-        }
-        
-        # Add identified cycles
-        for proxy_name, cycles in cycles_found.items():
-            metadata["milankovitch_cycles"][proxy_name] = []
-            for period, power in cycles:
-                metadata["milankovitch_cycles"][proxy_name].append({
-                    "cycle_type": self._get_cycle_name(period),
-                    "period_kyr": round(float(period), 3),
-                    "power_coherence": round(float(power), 3)
-                })
-        
-        # Save JSON
-        json_file = f'{self.experiment_dir}/spectral_analysis_metadata.json'
-        with open(json_file, 'w', encoding='utf-8') as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
-        
-        return json_file
-
-
