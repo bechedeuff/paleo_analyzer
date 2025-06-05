@@ -230,7 +230,7 @@ class PaleoclimateCorrelationAnalyzer:
         # Combined legend
         lines = line1 + line2
         labels = [l.get_label() for l in lines]
-        ax1.legend(lines, labels, loc='upper left')
+        ax1.legend(lines, labels, loc='lower right')
         
         # 2. Rolling correlation with interest areas
         ax2 = axes[0, 1]
@@ -318,7 +318,7 @@ class PaleoclimateCorrelationAnalyzer:
         plt.tight_layout()
         
         # Save figure
-        filename = f'{self.experiment_dir}/figures/comprehensive_analysis_window_{window_size}kyrs.png'
+        filename = f'{self.experiment_dir}/figures/analysis_window_{window_size}kyrs.png'
         plt.savefig(filename, dpi=config.DEFAULT_DPI, bbox_inches='tight')
         plt.close()
         print(f"✅ Figure saved: {filename}")
