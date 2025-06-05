@@ -1,10 +1,21 @@
-import os
-from src.utils import create_results_directory, save_experiment_config, print_configuration_summary, validate_configurations
-from src.rolling_window_analyzer import PaleoclimateCorrelationAnalyzer
+import numpy as np
+
+# Import modules
+from src.rolling_window_analyzer import PaleoclimateRollingWindowAnalyzer
 from src.spectral_analyzer import PaleoclimateSpectralAnalyzer
 from src.lead_lag_analyzer import PaleoclimateLead_LagAnalyzer
 from src import configurations as config
-import numpy as np
+from src.utils import (
+    create_results_directory, save_experiment_config, print_configuration_summary, validate_configurations,
+    export_rolling_window_results, export_spectral_results, export_leadlag_results,
+    load_paleoclimate_data, interpolate_to_common_grid
+)
+from src.metadata import (
+    create_rolling_window_metadata, create_spectral_metadata, create_leadlag_metadata
+)
+from src.pdf_reports import (
+    create_rolling_window_pdf_report, create_spectral_pdf_report, create_leadlag_pdf_report
+)
 
 def run_complete_analysis() -> None:
     """
@@ -49,17 +60,27 @@ def run_complete_analysis() -> None:
         print("="*70)
         
         # Initialize rolling window analyzer with specific subdirectory
-        rolling_analyzer = PaleoclimateCorrelationAnalyzer(f'{experiment_dir}/rolling_window')
+        rolling_analyzer = PaleoclimateRollingWindowAnalyzer(f'{experiment_dir}/rolling_window')
         
         # Data loading
         print("\n📂 LOADING DATA FOR CORRELATION ANALYSIS...")
-        if not rolling_analyzer.load_data(proxy1_file, proxy2_file):
+        success, data = load_paleoclimate_data(proxy1_file, proxy2_file)
+        if not success or not data:
             print("❌ Error in data loading for rolling window analysis!")
             return
         
+        # Set analyzer attributes
+        rolling_analyzer.proxy1_data = data['proxy1_data']
+        rolling_analyzer.proxy2_data = data['proxy2_data']
+        rolling_analyzer.proxy1_name = data['proxy1_name']
+        rolling_analyzer.proxy2_name = data['proxy2_name']
+        rolling_analyzer.proxy1_units = data['proxy1_units']
+        rolling_analyzer.proxy2_units = data['proxy2_units']
+        
         # Data processing
         print("\n🔧 PROCESSING DATA...")
-        rolling_analyzer.interpolate_to_common_grid()
+        rolling_analyzer.interpolated_data = interpolate_to_common_grid(
+            rolling_analyzer.proxy1_data, rolling_analyzer.proxy2_data)
         
         # Calculate rolling correlation
         print(f"\n📊 CALCULATING ROLLING CORRELATION (window: {config.ROLLING_WINDOW_ANALYSIS['window_size']} kyr)...")
@@ -72,7 +93,7 @@ def run_complete_analysis() -> None:
         # Generate visualizations
         print("\n📈 GENERATING ROLLING WINDOW VISUALIZATIONS...")
         
-        print("   • Comprehensive analysis (4 subplots)...")
+        print("   • Rolling window analysis...")
         rolling_analyzer.plot_comprehensive_analysis()
         
         print("   • Temporal evolution...")
@@ -84,12 +105,27 @@ def run_complete_analysis() -> None:
         # Export rolling window results
         print("\n💾 EXPORTING ROLLING WINDOW RESULTS...")
         
-        rolling_analyzer.export_results('rolling_correlation_results.csv')
+        # Export CSV results
+        if rolling_analyzer.rolling_correlation is not None:
+            export_rolling_window_results(rolling_analyzer.rolling_correlation, rolling_analyzer.proxy1_name, 
+                                            rolling_analyzer.proxy2_name, rolling_analyzer.experiment_dir, 
+                                            'rolling_correlation_results.csv')
         
-        rolling_pdf = rolling_analyzer.create_pdf_report(config.ROLLING_WINDOW_ANALYSIS['window_size'], periods)
+        # Create PDF report
+        print("\n📄 Generating PDF report...")
+        rolling_pdf = create_rolling_window_pdf_report(
+            rolling_analyzer.rolling_correlation, rolling_analyzer.interpolated_data,
+            rolling_analyzer.proxy1_name, rolling_analyzer.proxy2_name, 
+            config.ROLLING_WINDOW_ANALYSIS['window_size'], periods, rolling_analyzer.experiment_dir
+        )
         print(f"✅ Rolling window PDF report: {rolling_pdf}")
         
-        rolling_json = rolling_analyzer.create_json_metadata(config.ROLLING_WINDOW_ANALYSIS['window_size'], periods)
+        # Create JSON metadata
+        rolling_json = create_rolling_window_metadata(rolling_analyzer.rolling_correlation, rolling_analyzer.proxy1_data, 
+                                                        rolling_analyzer.proxy2_data, rolling_analyzer.interpolated_data,
+                                                        rolling_analyzer.proxy1_name, rolling_analyzer.proxy2_name,
+                                                        config.ROLLING_WINDOW_ANALYSIS['window_size'], periods, 
+                                                        rolling_analyzer.experiment_dir)
         print(f"✅ Rolling window metadata JSON: {rolling_json}")
         
         # Rolling window summary
@@ -109,15 +145,23 @@ def run_complete_analysis() -> None:
         # Initialize spectral analyzer with specific subdirectory
         spectral_analyzer = PaleoclimateSpectralAnalyzer(f'{experiment_dir}/spectral')
         
-        # Data loading (reuse same files)
+        # Data loading (reuse same data)
         print("\n📂 LOADING DATA FOR SPECTRAL ANALYSIS...")
-        if not spectral_analyzer.load_data(proxy1_file, proxy2_file):
-            print("❌ Error in data loading for spectral analysis!")
-            return
+        print("🔄 Loading paleoclimate data for spectral analysis...")
+        
+        # Set analyzer attributes (reuse loaded data)
+        spectral_analyzer.proxy1_data = data['proxy1_data']
+        spectral_analyzer.proxy2_data = data['proxy2_data']
+        spectral_analyzer.proxy1_name = data['proxy1_name']
+        spectral_analyzer.proxy2_name = data['proxy2_name']
+        spectral_analyzer.proxy1_units = data['proxy1_units']
+        spectral_analyzer.proxy2_units = data['proxy2_units']
         
         # Data processing
         print("\n🔧 PROCESSING DATA FOR SPECTRAL ANALYSIS...")
-        spectral_analyzer.interpolate_to_common_grid()
+        print("🔄 Interpolating to common grid for spectral analysis...")
+        spectral_analyzer.interpolated_data = interpolate_to_common_grid(
+            spectral_analyzer.proxy1_data, spectral_analyzer.proxy2_data)
         
         # Wavelet analysis
         print(f"\n🌊 WAVELET ANALYSIS ({config.SPECTRAL_ANALYSIS['wavelet_type']} wavelet)...")
@@ -130,7 +174,7 @@ def run_complete_analysis() -> None:
         # Generate spectral visualizations
         print("\n📈 GENERATING SPECTRAL VISUALIZATIONS...")
         
-        print("   • Comprehensive wavelet analysis...")
+        print("   • Wavelet analysis...")
         spectral_analyzer.plot_comprehensive_wavelet_analysis(proxy_num=1)
         spectral_analyzer.plot_comprehensive_wavelet_analysis(proxy_num=2)
         
@@ -143,12 +187,29 @@ def run_complete_analysis() -> None:
         # Export spectral results
         print("\n💾 EXPORTING SPECTRAL RESULTS...")
         
-        spectral_analyzer.export_results('spectral_analysis_results.csv')
+        # Export CSV results
+        if spectral_analyzer.cwt1_power is not None:
+            export_spectral_results(spectral_analyzer.cwt1_power, spectral_analyzer.cwt2_power, 
+                                    spectral_analyzer.coherence, spectral_analyzer.periods, 
+                                    spectral_analyzer.freqs, spectral_analyzer.proxy1_name, 
+                                    spectral_analyzer.proxy2_name, spectral_analyzer.experiment_dir, 
+                                    'spectral_analysis_results.csv')
         
-        spectral_pdf = spectral_analyzer.create_pdf_report(cycles_found)
+        # Create PDF report
+        print("\n📄 Generating spectral PDF report...")
+        spectral_pdf = create_spectral_pdf_report(
+            spectral_analyzer.interpolated_data, spectral_analyzer.periods,
+            spectral_analyzer.proxy1_name, spectral_analyzer.proxy2_name,
+            cycles_found, spectral_analyzer.experiment_dir
+        )
         print(f"✅ Spectral analysis PDF report: {spectral_pdf}")
         
-        spectral_json = spectral_analyzer.create_json_metadata(cycles_found)
+        # Create JSON metadata
+        spectral_json = create_spectral_metadata(spectral_analyzer.interpolated_data, spectral_analyzer.cwt1_power, 
+                                                spectral_analyzer.cwt2_power, spectral_analyzer.coherence, 
+                                                spectral_analyzer.periods, spectral_analyzer.proxy1_name, 
+                                                spectral_analyzer.proxy2_name, cycles_found, 
+                                                spectral_analyzer.experiment_dir)
         print(f"✅ Spectral analysis metadata JSON: {spectral_json}")
         
         # Spectral summary
@@ -172,15 +233,21 @@ def run_complete_analysis() -> None:
         # Initialize lead-lag analyzer with specific subdirectory
         leadlag_analyzer = PaleoclimateLead_LagAnalyzer(f'{experiment_dir}/lead_lag')
         
-        # Data loading (reuse same files)
+        # Data loading (reuse same data)
         print("\n📂 LOADING DATA FOR LEAD-LAG ANALYSIS...")
-        if not leadlag_analyzer.load_data(proxy1_file, proxy2_file):
-            print("❌ Error in data loading for lead-lag analysis!")
-            return
+        
+        # Set analyzer attributes (reuse loaded data)
+        leadlag_analyzer.proxy1_data = data['proxy1_data']
+        leadlag_analyzer.proxy2_data = data['proxy2_data']
+        leadlag_analyzer.proxy1_name = data['proxy1_name']
+        leadlag_analyzer.proxy2_name = data['proxy2_name']
+        leadlag_analyzer.proxy1_units = data['proxy1_units']
+        leadlag_analyzer.proxy2_units = data['proxy2_units']
         
         # Data processing
         print("\n🔧 PROCESSING DATA FOR LEAD-LAG ANALYSIS...")
-        leadlag_analyzer.interpolate_to_common_grid()
+        leadlag_analyzer.interpolated_data = interpolate_to_common_grid(
+            leadlag_analyzer.proxy1_data, leadlag_analyzer.proxy2_data)
         
         # Lead-lag analysis
         print(f"\n🔄 LEAD-LAG ANALYSIS (max lag: {config.LEADLAG_ANALYSIS['max_lag_kyr']} kyr)...")
@@ -189,18 +256,30 @@ def run_complete_analysis() -> None:
         # Generate lead-lag visualizations
         print("\n📈 GENERATING LEAD-LAG VISUALIZATIONS...")
         
-        print("   • Comprehensive lead-lag analysis...")
+        print("   • Lead-lag analysis...")
         leadlag_analyzer.plot_comprehensive_leadlag_analysis()
         
         # Export lead-lag results
         print("\n💾 EXPORTING LEAD-LAG RESULTS...")
         
-        leadlag_analyzer.export_results('leadlag_analysis_results.csv')
+        # Export CSV results
+        if leadlag_analyzer.leadlag_results is not None:
+            export_leadlag_results(leadlag_analyzer.leadlag_results, leadlag_analyzer.experiment_dir, 
+                                    'leadlag_analysis_results.csv')
         
-        leadlag_pdf = leadlag_analyzer.create_pdf_report()
+        # Create PDF report
+        print("\n📄 Generating lead-lag PDF report...")
+        leadlag_pdf = create_leadlag_pdf_report(
+            leadlag_analyzer.leadlag_results, leadlag_analyzer.interpolated_data,
+            leadlag_analyzer.proxy1_name, leadlag_analyzer.proxy2_name,
+            leadlag_analyzer.experiment_dir
+        )
         print(f"✅ Lead-lag analysis PDF report: {leadlag_pdf}")
         
-        leadlag_json = leadlag_analyzer.create_json_metadata()
+        # Create JSON metadata
+        leadlag_json = create_leadlag_metadata(leadlag_analyzer.leadlag_results, leadlag_analyzer.interpolated_data,
+                                                leadlag_analyzer.proxy1_name, leadlag_analyzer.proxy2_name, 
+                                                leadlag_analyzer.experiment_dir)
         print(f"✅ Lead-lag analysis metadata JSON: {leadlag_json}")
         
         # Lead-lag summary
