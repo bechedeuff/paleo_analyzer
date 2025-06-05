@@ -170,8 +170,8 @@ class PaleoclimateSpectralAnalyzer:
         print(f"✅ Interpolation completed: {len(self.interpolated_data)} points")
         print(f"   Final range: {self.interpolated_data['age_kyr'].min():.1f} - {self.interpolated_data['age_kyr'].max():.1f} kyr")
         
-    def calculate_wavelet_transform(self, wavelet_type: str = config.WAVELET_TYPE, 
-                                  wavelet_param: float = config.WAVELET_PARAM) -> None:
+    def calculate_wavelet_transform(self, wavelet_type: str = config.SPECTRAL_ANALYSIS['wavelet_type'], 
+                                    wavelet_param: float = config.SPECTRAL_ANALYSIS['wavelet_param']) -> None:
         """
         Calculate continuous wavelet transform for both proxies using PyCWT best practices
         
@@ -231,7 +231,7 @@ class PaleoclimateSpectralAnalyzer:
         # Starting scale and resolution
         s0 = 2 * self.dt  # Starting scale
         dj = 1 / 12  # Twelve sub-octaves per octave
-        J = int(np.log2(config.MAX_PERIOD / (2 * self.dt)) / dj)  # Number of scales
+        J = int(np.log2(config.SPECTRAL_ANALYSIS['max_period'] / (2 * self.dt)) / dj)  # Number of scales
         
         # Perform CWT for both proxies
         self.cwt1, self.scales, self.freqs, self.coi1, fft1, fftfreqs1 = wavelet.cwt(
@@ -269,18 +269,18 @@ class PaleoclimateSpectralAnalyzer:
         
         self.global_signif1, _ = wavelet.significance(
             self.var1, self.dt, self.scales, 1, self.alpha1,
-            significance_level=config.CONFIDENCE_LEVEL, dof=dof, wavelet=mother
+            significance_level=config.SPECTRAL_ANALYSIS['confidence_level'], dof=dof, wavelet=mother
         )
         
         self.global_signif2, _ = wavelet.significance(
             self.var2, self.dt, self.scales, 1, self.alpha2,
-            significance_level=config.CONFIDENCE_LEVEL, dof=dof, wavelet=mother
+            significance_level=config.SPECTRAL_ANALYSIS['confidence_level'], dof=dof, wavelet=mother
         )
         
-        print(f"✅ Advanced wavelet analysis completed")
+        print(f"✅ Wavelet analysis completed")
         print(f"   Period range: {self.periods.min():.1f} - {self.periods.max():.1f} kyr")
         print(f"   Frequency resolution: {len(self.periods)} bands")
-        print(f"   Confidence level: {config.CONFIDENCE_LEVEL*100:.0f}%")
+        print(f"   Confidence level: {config.SPECTRAL_ANALYSIS['confidence_level']*100:.0f}%")
         
     def _calculate_significance_levels(self, mother) -> None:
         """
@@ -291,13 +291,13 @@ class PaleoclimateSpectralAnalyzer:
         # Significance test for proxy 1
         self.significance1, _ = wavelet.significance(
             1.0, self.dt, self.scales, 0, self.alpha1,
-            significance_level=config.CONFIDENCE_LEVEL, wavelet=mother
+            significance_level=config.SPECTRAL_ANALYSIS['confidence_level'], wavelet=mother
         )
         
         # Significance test for proxy 2
         self.significance2, _ = wavelet.significance(
             1.0, self.dt, self.scales, 0, self.alpha2,
-            significance_level=config.CONFIDENCE_LEVEL, wavelet=mother
+            significance_level=config.SPECTRAL_ANALYSIS['confidence_level'], wavelet=mother
         )
         
         # Create significance arrays for plotting
@@ -405,14 +405,14 @@ class PaleoclimateSpectralAnalyzer:
         # Calculate significance level for scale-averaged power
         scale_avg_signif1, _ = wavelet.significance(
             self.var1, self.dt, self.scales, 2, self.alpha1,
-            significance_level=config.CONFIDENCE_LEVEL,
+            significance_level=config.SPECTRAL_ANALYSIS['confidence_level'],
             dof=[self.scales[sel[0]], self.scales[sel[-1]]],
             wavelet=mother
         )
         
         scale_avg_signif2, _ = wavelet.significance(
             self.var2, self.dt, self.scales, 2, self.alpha2,
-            significance_level=config.CONFIDENCE_LEVEL,
+            significance_level=config.SPECTRAL_ANALYSIS['confidence_level'],
             dof=[self.scales[sel[0]], self.scales[sel[-1]]],
             wavelet=mother
         )
@@ -449,7 +449,7 @@ class PaleoclimateSpectralAnalyzer:
             global_coherence = np.zeros_like(global_power1)
         
         # Check each Milankovitch cycle
-        for cycle_name, cycle_periods in config.MILANKOVITCH_CYCLES.items():
+        for cycle_name, cycle_periods in config.SPECTRAL_ANALYSIS['milankovitch_cycles'].items():
             for target_period in cycle_periods:
                 # Find closest period in our analysis
                 period_idx = np.argmin(np.abs(self.periods - target_period))
@@ -467,13 +467,13 @@ class PaleoclimateSpectralAnalyzer:
                     if power2 > np.percentile(global_power2, 75):
                         cycles_found['proxy2'].append((actual_period, power2))
                         
-                    if coherence > config.COHERENCE_THRESHOLD:
+                    if coherence > config.SPECTRAL_ANALYSIS['coherence_threshold']:
                         cycles_found['coherent'].append((actual_period, coherence))
         
         return cycles_found
         
     def plot_comprehensive_wavelet_analysis(self, proxy_num: int = 1,
-                                            figsize: Tuple[int, int] = config.WAVELET_POWER_PLOT['figsize']) -> None:
+                                            figsize: Tuple[int, int] = config.SPECTRAL_PLOTS['wavelet_power_figsize']) -> None:
         """
         Create comprehensive wavelet analysis plot following PyCWT tutorial style
         
@@ -516,7 +516,7 @@ class PaleoclimateSpectralAnalyzer:
         # Inverse wavelet transform for reconstruction
         iwave = wavelet.icwt(self.cwt1 if proxy_num == 1 else self.cwt2, 
                             self.scales, self.dt, 1/12, 
-                            wavelet.Morlet(config.WAVELET_PARAM)) * std
+                            wavelet.Morlet(config.SPECTRAL_ANALYSIS['wavelet_param'])) * std
         
         # Create figure with PyCWT tutorial layout
         fig = plt.figure(figsize=figsize)
@@ -538,7 +538,7 @@ class PaleoclimateSpectralAnalyzer:
         levels = [0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
         im = ax2.contourf(time, np.log2(self.periods), np.log2(power), 
                             np.log2(levels), extend='both', 
-                            cmap=config.WAVELET_POWER_PLOT['colormap'])
+                            cmap=config.SPECTRAL_PLOTS['wavelet_power_colormap'])
         
         # Significance contours
         extent = [time.min(), time.max(), 0, max(self.periods)]
@@ -552,7 +552,7 @@ class PaleoclimateSpectralAnalyzer:
                                 np.log2(self.periods[-1:]), [1e-9]]),
                 'k', alpha=0.3, hatch='x', label='COI')
         
-        ax2.set_title(f'b) {proxy_name} Wavelet Power Spectrum ({config.WAVELET_TYPE.title()})')
+        ax2.set_title(f'b) {proxy_name} Wavelet Power Spectrum ({config.SPECTRAL_ANALYSIS["wavelet_type"].title()})')
         ax2.set_ylabel('Period (kyr)')
         
         # Y-axis ticks in period scale
@@ -563,7 +563,7 @@ class PaleoclimateSpectralAnalyzer:
         ax2.invert_xaxis()
         
         # Add Milankovitch cycle indicators
-        for cycle_name, cycle_periods in config.MILANKOVITCH_CYCLES.items():
+        for cycle_name, cycle_periods in config.SPECTRAL_ANALYSIS['milankovitch_cycles'].items():
             for period in cycle_periods:
                 if self.periods.min() <= period <= self.periods.max():
                     ax2.axhline(y=np.log2(period), color='white', linestyle='--', alpha=0.7)
@@ -588,7 +588,7 @@ class PaleoclimateSpectralAnalyzer:
         
         # Calculate scale-averaged power for 2-8 kyr band (example)
         try:
-            mother = wavelet.Morlet(config.WAVELET_PARAM)
+            mother = wavelet.Morlet(config.SPECTRAL_ANALYSIS['wavelet_param'])
             (scale_avg1, scale_avg2), (scale_avg_signif1, scale_avg_signif2) = self.calculate_scale_averaged_power((2, 8), mother)
             
             if proxy_num == 1:
@@ -620,7 +620,7 @@ class PaleoclimateSpectralAnalyzer:
         plt.close()
         print(f"✅ Comprehensive wavelet analysis saved: {filename}")
         
-    def plot_cross_wavelet_analysis(self, figsize: Tuple[int, int] = config.CROSS_WAVELET_PLOT['figsize']) -> None:
+    def plot_cross_wavelet_analysis(self, figsize: Tuple[int, int] = config.SPECTRAL_PLOTS['cross_wavelet_figsize']) -> None:
         """
         Plot cross-wavelet analysis including coherence and phase relationships
         """
@@ -638,7 +638,7 @@ class PaleoclimateSpectralAnalyzer:
         # Cross-wavelet power
         cross_power_abs = np.abs(self.cross_power)
         im1 = ax1.contourf(time, self.periods, cross_power_abs, 
-                            levels=20, cmap=config.CROSS_WAVELET_PLOT['colormap'])
+                            levels=20, cmap=config.SPECTRAL_PLOTS['cross_wavelet_colormap'])
         ax1.set_ylabel('Period (kyr)')
         ax1.set_title('Cross-Wavelet Power')
         ax1.set_yscale('log')
@@ -656,7 +656,7 @@ class PaleoclimateSpectralAnalyzer:
         ax2.invert_xaxis()
         
         # Add coherence threshold line
-        coherent_regions = self.coherence > config.COHERENCE_THRESHOLD
+        coherent_regions = self.coherence > config.SPECTRAL_ANALYSIS['coherence_threshold']
         ax2.contour(time, self.periods, coherent_regions, levels=[0.5], 
                     colors='black', linewidths=2)
         
@@ -677,11 +677,11 @@ class PaleoclimateSpectralAnalyzer:
         # Global coherence
         global_coherence = np.mean(self.coherence, axis=1)
         ax4.semilogx(global_coherence, self.periods, 'b-', linewidth=2, label='Global Coherence')
-        ax4.axvline(x=config.COHERENCE_THRESHOLD, color='r', linestyle='--', 
-                    label=f'Threshold ({config.COHERENCE_THRESHOLD})')
+        ax4.axvline(x=config.SPECTRAL_ANALYSIS['coherence_threshold'], color='r', linestyle='--', 
+                    label=f'Threshold ({config.SPECTRAL_ANALYSIS["coherence_threshold"]})')
         
         # Add Milankovitch cycles
-        for cycle_name, cycle_periods in config.MILANKOVITCH_CYCLES.items():
+        for cycle_name, cycle_periods in config.SPECTRAL_ANALYSIS['milankovitch_cycles'].items():
             for period in cycle_periods:
                 ax4.axhline(y=period, color='gray', linestyle=':', alpha=0.5)
                 ax4.text(0.02, period, f'{period}', fontsize=8, va='center')
@@ -703,7 +703,7 @@ class PaleoclimateSpectralAnalyzer:
         plt.close()
         print(f"✅ Cross-wavelet analysis saved: {filename}")
         
-    def plot_global_wavelet_spectra(self, figsize: Tuple[int, int] = config.GLOBAL_SPECTRUM_PLOT['figsize']) -> None:
+    def plot_global_wavelet_spectra(self, figsize: Tuple[int, int] = config.SPECTRAL_PLOTS['global_spectrum_figsize']) -> None:
         """
         Plot global wavelet spectra for both proxies
         """
@@ -721,11 +721,11 @@ class PaleoclimateSpectralAnalyzer:
         ax1.loglog(self.periods, global_power2, 'r-', linewidth=2, label=self.proxy2_name)
         
         # Add Milankovitch cycles
-        if config.GLOBAL_SPECTRUM_PLOT['show_milankovitch']:
-            for cycle_name, cycle_periods in config.MILANKOVITCH_CYCLES.items():
+        if config.SPECTRAL_PLOTS['global_spectrum_show_milankovitch']:
+            for cycle_name, cycle_periods in config.SPECTRAL_ANALYSIS['milankovitch_cycles'].items():
                 for period in cycle_periods:
                     ax1.axvline(x=period, color='gray', linestyle='--', 
-                                alpha=config.GLOBAL_SPECTRUM_PLOT['milankovitch_alpha'])
+                                alpha=config.SPECTRAL_PLOTS['global_spectrum_milankovitch_alpha'])
                     ax1.text(period, global_power1.max() * 0.8, f'{period}', 
                             rotation=90, fontsize=8, ha='center')
         
@@ -739,15 +739,15 @@ class PaleoclimateSpectralAnalyzer:
         global_coherence = np.mean(self.coherence, axis=1)
         ax2.semilogx(self.periods, global_coherence, 'purple', linewidth=2, 
                         label='Global Coherence')
-        ax2.axhline(y=config.COHERENCE_THRESHOLD, color='r', linestyle='--',
-                    label=f'Threshold ({config.COHERENCE_THRESHOLD})')
+        ax2.axhline(y=config.SPECTRAL_ANALYSIS['coherence_threshold'], color='r', linestyle='--',
+                    label=f'Threshold ({config.SPECTRAL_ANALYSIS["coherence_threshold"]})')
         
         # Add Milankovitch cycles
-        if config.GLOBAL_SPECTRUM_PLOT['show_milankovitch']:
-            for cycle_name, cycle_periods in config.MILANKOVITCH_CYCLES.items():
+        if config.SPECTRAL_PLOTS['global_spectrum_show_milankovitch']:
+            for cycle_name, cycle_periods in config.SPECTRAL_ANALYSIS['milankovitch_cycles'].items():
                 for period in cycle_periods:
                     ax2.axvline(x=period, color='gray', linestyle='--', 
-                                alpha=config.GLOBAL_SPECTRUM_PLOT['milankovitch_alpha'])
+                                alpha=config.SPECTRAL_PLOTS['global_spectrum_milankovitch_alpha'])
         
         ax2.set_xlabel('Period (kyr)')
         ax2.set_ylabel('Coherence')
@@ -791,7 +791,7 @@ class PaleoclimateSpectralAnalyzer:
             f'{self.proxy1_name}_global_power': global_power1.round(3),
             f'{self.proxy2_name}_global_power': global_power2.round(3),
             'global_coherence': global_coherence.round(3),
-            'significant_coherence': (global_coherence > config.COHERENCE_THRESHOLD).astype(int)
+            'significant_coherence': (global_coherence > config.SPECTRAL_ANALYSIS['coherence_threshold']).astype(int)
         })
         
         export_data.to_csv(full_path, index=False, sep=';', decimal=',')
@@ -847,9 +847,9 @@ class PaleoclimateSpectralAnalyzer:
             ['Analysis date:', analysis_date],
             ['Proxy 1:', self.proxy1_name],
             ['Proxy 2:', self.proxy2_name],
-            ['Wavelet type:', config.WAVELET_TYPE],
+            ['Wavelet type:', config.SPECTRAL_ANALYSIS['wavelet_type']],
             ['Period range:', f"{self.periods.min():.1f} - {self.periods.max():.1f} kyr"],
-            ['Coherence threshold:', str(config.COHERENCE_THRESHOLD)],
+            ['Coherence threshold:', str(config.SPECTRAL_ANALYSIS['coherence_threshold'])],
             ['Total time points:', str(len(self.interpolated_data))]
         ]
         
@@ -901,7 +901,7 @@ class PaleoclimateSpectralAnalyzer:
         """
         Get the name of Milankovitch cycle based on period
         """
-        for cycle_name, cycle_periods in config.MILANKOVITCH_CYCLES.items():
+        for cycle_name, cycle_periods in config.SPECTRAL_ANALYSIS['milankovitch_cycles'].items():
             for target_period in cycle_periods:
                 if abs(period - target_period) / target_period < 0.2:
                     return cycle_name.replace('_', ' ').title()
@@ -933,8 +933,8 @@ class PaleoclimateSpectralAnalyzer:
                 "analysis_type": "spectral_wavelet",
                 "proxy1_name": self.proxy1_name,
                 "proxy2_name": self.proxy2_name,
-                "wavelet_type": config.WAVELET_TYPE,
-                "wavelet_parameter": config.WAVELET_PARAM,
+                "wavelet_type": config.SPECTRAL_ANALYSIS['wavelet_type'],
+                "wavelet_parameter": config.SPECTRAL_ANALYSIS['wavelet_param'],
                 "analysis_period": {
                     "start_kyr": float(self.interpolated_data['age_kyr'].min()),
                     "end_kyr": float(self.interpolated_data['age_kyr'].max()),
@@ -951,16 +951,16 @@ class PaleoclimateSpectralAnalyzer:
                 "proxy2_total_power": round(float(np.sum(global_power2)), 3),
                 "mean_coherence": round(float(np.mean(global_coherence)), 3),
                 "max_coherence": round(float(np.max(global_coherence)), 3),
-                "coherent_frequencies": int(np.sum(global_coherence > config.COHERENCE_THRESHOLD))
+                "coherent_frequencies": int(np.sum(global_coherence > config.SPECTRAL_ANALYSIS['coherence_threshold']))
             },
             "milankovitch_cycles": {},
             "configuration_used": {
-                "wavelet_type": config.WAVELET_TYPE,
-                "wavelet_param": config.WAVELET_PARAM,
-                "min_period": config.MIN_PERIOD,
-                "max_period": config.MAX_PERIOD,
-                "coherence_threshold": config.COHERENCE_THRESHOLD,
-                "confidence_level": config.CONFIDENCE_LEVEL
+                "wavelet_type": config.SPECTRAL_ANALYSIS['wavelet_type'],
+                "wavelet_param": config.SPECTRAL_ANALYSIS['wavelet_param'],
+                "min_period": config.SPECTRAL_ANALYSIS['min_period'],
+                "max_period": config.SPECTRAL_ANALYSIS['max_period'],
+                "coherence_threshold": config.SPECTRAL_ANALYSIS['coherence_threshold'],
+                "confidence_level": config.SPECTRAL_ANALYSIS['confidence_level']
             }
         }
         

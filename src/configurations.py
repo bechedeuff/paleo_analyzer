@@ -1,5 +1,5 @@
 # =============================================================================
-# DATA FILES CONFIGURATION
+# GENERAL CONFIGURATIONS
 # =============================================================================
 
 # CSV file names (files should be in 'data/' folder)
@@ -7,6 +7,9 @@
 # The CSV should be separated by commas
 PROXY1_FILE = "d13C_age_cibicides.csv"
 PROXY2_FILE = "lnmn-sue-TD-age.csv"
+
+# Interpolation resolution for common temporal grid in kyr
+INTERPOLATION_RESOLUTION = 1.0
 
 # =============================================================================
 # GENERAL VISUALIZATION CONFIGURATIONS
@@ -28,39 +31,13 @@ DEFAULT_DPI = 300
 # ROLLING WINDOW ANALYSIS PARAMETERS
 # =============================================================================
 
-# Rolling window size in kyr (default: 41 kyr - Milankovitch obliquity cycle)
-WINDOW_SIZE = 41
-
-# Interpolation resolution for common temporal grid in kyr (default: 1.0)
-INTERPOLATION_RESOLUTION = 1.0
-
-# Minimum periods for rolling correlation calculation
-# If None, will be automatically set to max(10, window_size // 2)
-MIN_PERIODS = None
-
-# Correlation thresholds for period identification
-THRESHOLD_HIGH = 0.7   # High correlation threshold (positive and negative)
-THRESHOLD_LOW = 0.2    # Decoupling threshold
-
-# =============================================================================
-# ROLLING WINDOW PLOTS CONFIGURATIONS
-# =============================================================================
-
-# Comprehensive Analysis Plot
-COMPREHENSIVE_ANALYSIS = {
-    'figsize': (16, 12)
-}
-
-# Temporal Evolution Plot
-TEMPORAL_EVOLUTION = {
-    'figsize': (15, 8),
-    'x_tick_interval': 40  # X-axis ticks every N kyr
-}
-
-# Window Comparison Plot
-WINDOW_COMPARISON = {
-    'window_sizes': [20, 41, 100, 400],  # Window sizes to compare (kyr)
-    'figsize': (16, 10),
+# Rolling Window Analysis Configuration
+ROLLING_WINDOW_ANALYSIS = {
+    'window_size': 41,               # Rolling window size in kyr (default: 41 kyr - Milankovitch obliquity cycle)
+    'min_periods': None,             # Minimum periods for rolling correlation calculation (None = auto)
+    'threshold_high': 0.7,           # High correlation threshold (positive and negative)
+    'threshold_low': 0.2,            # Decoupling threshold
+    'window_comparison_sizes': [20, 41, 100, 400],  # Window sizes to compare (kyr)
     'cycle_names': [
         'Precession (~20 kyr)',
         'Obliquity (~41 kyr)', 
@@ -69,51 +46,43 @@ WINDOW_COMPARISON = {
     ]
 }
 
+# Rolling Window Plots Configuration
+ROLLING_WINDOW_PLOTS = {
+    'comprehensive_figsize': (16, 12),
+    'temporal_evolution_figsize': (15, 8),
+    'temporal_evolution_x_tick_interval': 40,  # X-axis ticks every N kyr
+    'window_comparison_figsize': (16, 10),
+}
+
 # =============================================================================
 # SPECTRAL ANALYSIS PARAMETERS
 # =============================================================================
 
-# Wavelet Analysis Parameters
-WAVELET_TYPE = 'morlet'  # Type of wavelet ('morlet', 'paul', 'dog')
-WAVELET_PARAM = 6        # Wavelet parameter (for Morlet: wavenumber k0)
-
-# Frequency/Period Analysis
-MIN_PERIOD = 2.0         # Minimum period to analyze (kyr)
-MAX_PERIOD = 1000.0      # Maximum period to analyze (kyr)
-
-# Statistical Analysis
-COHERENCE_THRESHOLD = 0.7    # Coherence threshold for significant regions
-CONFIDENCE_LEVEL = 0.95      # Confidence level for significance testing
-
-# Milankovitch Cycles for Reference
-MILANKOVITCH_CYCLES = {
-    'precession': [19, 23],      # Precession cycles (kyr)
-    'obliquity': [41],           # Obliquity cycles (kyr)
-    'eccentricity_short': [100], # Short eccentricity cycles (kyr)
-    'eccentricity_long': [400]   # Long eccentricity cycles (kyr)
+# Spectral Analysis Configuration
+SPECTRAL_ANALYSIS = {
+    'wavelet_type': 'morlet',        # Type of wavelet ('morlet', 'paul', 'dog')
+    'wavelet_param': 6,              # Wavelet parameter (for Morlet: wavenumber k0)
+    'min_period': 2.0,               # Minimum period to analyze (kyr)
+    'max_period': 1000.0,            # Maximum period to analyze (kyr)
+    'coherence_threshold': 0.7,      # Coherence threshold for significant regions
+    'confidence_level': 0.95,        # Confidence level for significance testing
+    'milankovitch_cycles': {
+        'precession': [19, 23],      # Precession cycles (kyr)
+        'obliquity': [41],           # Obliquity cycles (kyr)
+        'eccentricity_short': [100], # Short eccentricity cycles (kyr)
+        'eccentricity_long': [400]   # Long eccentricity cycles (kyr)
+    }
 }
 
-# =============================================================================
-# SPECTRAL PLOTS CONFIGURATIONS
-# =============================================================================
-
-# Wavelet Power Spectrum Plot
-WAVELET_POWER_PLOT = {
-    'figsize': (16, 10),
-    'colormap': 'jet'
-}
-
-# Cross-Wavelet Plot
-CROSS_WAVELET_PLOT = {
-    'figsize': (16, 12),
-    'colormap': 'RdBu_r',
-}
-
-# Global Wavelet Spectrum Plot
-GLOBAL_SPECTRUM_PLOT = {
-    'figsize': (12, 8),
-    'show_milankovitch': True,
-    'milankovitch_alpha': 0.3
+# Spectral Plots Configuration
+SPECTRAL_PLOTS = {
+    'wavelet_power_figsize': (16, 10),
+    'wavelet_power_colormap': 'jet',
+    'cross_wavelet_figsize': (16, 12),
+    'cross_wavelet_colormap': 'RdBu_r',
+    'global_spectrum_figsize': (12, 8),
+    'global_spectrum_show_milankovitch': True,
+    'global_spectrum_milankovitch_alpha': 0.3,
 }
 
 # =============================================================================
@@ -148,7 +117,6 @@ LEADLAG_PLOTS = {
     'correlation_types_figsize': (14, 8),
     'confidence_intervals_figsize': (12, 8),
     'colormap': 'RdBu_r',
-    'dpi': 300,
     'default_correlation_type': 'pearson',  # Default correlation type for contrast plot
-    'contrast_line_color': 'darkred'        # Color for contrast line (avoid blue)
+    'contrast_line_color': 'darkred'        # Color for contrast line (avoid blue because it's similar to the A's plot)
 }

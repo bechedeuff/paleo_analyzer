@@ -124,7 +124,7 @@ class PaleoclimateCorrelationAnalyzer:
         print(f"✅ Interpolation completed: {len(self.interpolated_data)} points")
         print(f"   Final range: {self.interpolated_data['age_kyr'].min():.1f} - {self.interpolated_data['age_kyr'].max():.1f} kyr")
         
-    def calculate_rolling_correlation(self, window_size: int = config.WINDOW_SIZE, min_periods: Optional[int] = config.MIN_PERIODS) -> None:
+    def calculate_rolling_correlation(self, window_size: int = config.ROLLING_WINDOW_ANALYSIS['window_size'], min_periods: Optional[int] = config.ROLLING_WINDOW_ANALYSIS['min_periods']) -> None:
         """
         Calculate rolling correlation between the two proxies
         
@@ -160,7 +160,7 @@ class PaleoclimateCorrelationAnalyzer:
         
         print(f"✅ Rolling correlation calculated: {len(self.rolling_correlation)} points")
         
-    def identify_correlation_periods(self, threshold_high: float = config.THRESHOLD_HIGH, threshold_low: float = config.THRESHOLD_LOW) -> Dict[str, pd.DataFrame]:
+    def identify_correlation_periods(self, threshold_high: float = config.ROLLING_WINDOW_ANALYSIS['threshold_high'], threshold_low: float = config.ROLLING_WINDOW_ANALYSIS['threshold_low']) -> Dict[str, pd.DataFrame]:
         """
         Identify and return specific correlation periods
         
@@ -189,7 +189,7 @@ class PaleoclimateCorrelationAnalyzer:
         
         return periods
         
-    def plot_comprehensive_analysis(self, window_size: int = config.WINDOW_SIZE, figsize: Tuple[int, int] = config.COMPREHENSIVE_ANALYSIS['figsize']) -> None:
+    def plot_comprehensive_analysis(self, window_size: int = config.ROLLING_WINDOW_ANALYSIS['window_size'], figsize: Tuple[int, int] = config.ROLLING_WINDOW_PLOTS['comprehensive_figsize']) -> None:
         """
         Create comprehensive visualization with 4 subplots and save to file
         
@@ -323,7 +323,7 @@ class PaleoclimateCorrelationAnalyzer:
         plt.close()
         print(f"✅ Figure saved: {filename}")
         
-    def plot_temporal_evolution(self, window_size: int = config.WINDOW_SIZE, figsize: Tuple[int, int] = config.TEMPORAL_EVOLUTION['figsize']) -> None:
+    def plot_temporal_evolution(self, window_size: int = config.ROLLING_WINDOW_ANALYSIS['window_size'], figsize: Tuple[int, int] = config.ROLLING_WINDOW_PLOTS['temporal_evolution_figsize']) -> None:
         """
         Plot of temporal evolution with areas colored by period and save to file
         
@@ -386,7 +386,7 @@ class PaleoclimateCorrelationAnalyzer:
         ax2.invert_xaxis()
         
         # Set x-axis ticks using configured interval
-        tick_interval = config.TEMPORAL_EVOLUTION['x_tick_interval']
+        tick_interval = config.ROLLING_WINDOW_PLOTS['temporal_evolution_x_tick_interval']
         min_age = min(ages.min(), self.interpolated_data['age_kyr'].min())
         max_age = max(ages.max(), self.interpolated_data['age_kyr'].max())
         # Round to nearest tick_interval for clean ticks
@@ -406,7 +406,7 @@ class PaleoclimateCorrelationAnalyzer:
         plt.close()
         print(f"✅ Figure saved: {filename}")
         
-    def compare_window_sizes(self, window_sizes: List[int] = config.WINDOW_COMPARISON['window_sizes'], figsize: Tuple[int, int] = config.WINDOW_COMPARISON['figsize']) -> None:
+    def compare_window_sizes(self, window_sizes: List[int] = config.ROLLING_WINDOW_ANALYSIS['window_comparison_sizes'], figsize: Tuple[int, int] = config.ROLLING_WINDOW_PLOTS['window_comparison_figsize']) -> None:
         """
         Compare rolling correlation for 4 different window sizes
         
@@ -429,7 +429,7 @@ class PaleoclimateCorrelationAnalyzer:
         axes = axes.flatten()
         
         # Names of cycles for the titles (from configuration)
-        cycle_names = config.WINDOW_COMPARISON['cycle_names']
+        cycle_names = config.ROLLING_WINDOW_ANALYSIS['cycle_names']
         
         for i, window in enumerate(window_sizes[:4]):  # Maximum 4 windows
             print(f"🔄 Calculating rolling correlation for window of {window} kyr")

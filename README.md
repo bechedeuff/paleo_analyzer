@@ -42,17 +42,13 @@ A tool for analyzing paleoclimate proxy relationships using rolling window corre
 1. **Prepare your data**: Place CSV files in the `data/` folder
    - The CSV should be separated by commas
    - Format: First column = age (kyr), Second column = proxy values
-   - Example: `data/d13C_age_cibicides.csv`, `data/lnmn-sue-TD-age.csv`
+   - Example: `data/proxy_1.csv`, `data/proxy_2.csv`
 
 2. **Configure analysis**: Edit `src/configurations.py`
    ```python
+   # Data files
    PROXY1_FILE = "file_1.csv"
    PROXY2_FILE = "file_2.csv"
-   
-   WINDOW_SIZE = 41  # kyr
-   INTERPOLATION_RESOLUTION = 1.0  # kyr
-   THRESHOLD_HIGH = 0.7
-   THRESHOLD_LOW = 0.2
    ```
 
 3. **Run analysis**:
@@ -82,58 +78,75 @@ Each analysis method provides complementary insights:
 
 All analysis parameters are controlled via `src/configurations.py`:
 
-### Data Configuration
+### General Configurations
 - `PROXY1_FILE`: First CSV file name (in data/ folder)
 - `PROXY2_FILE`: Second CSV file name (in data/ folder)
-
-### General Settings
 - `INTERPOLATION_RESOLUTION`: Temporal resolution in kyr (default: 1.0)
+
+### General Visualization Configurations
 - `MATPLOTLIB_STYLE`: Plot style (default: 'seaborn-v0_8')
 - `SEABORN_PALETTE`: Color palette (default: "husl")
 - `DEFAULT_FIGURE_SIZE`: Default figure dimensions
 - `DEFAULT_FONT_SIZE`: Default font size
 - `DEFAULT_DPI`: Figure resolution (default: 300)
 
-### Rolling Window Analysis
-- `WINDOW_SIZE`: Rolling window size in kyr (default: 41)
-- `MIN_PERIODS`: Minimum periods for correlation calculation (default: None = auto)
-- `THRESHOLD_HIGH`: High correlation threshold (default: 0.7)
-- `THRESHOLD_LOW`: Decoupling threshold (default: 0.2)
-- `WINDOW_COMPARISON['window_sizes']`: Window sizes for comparison [20, 41, 100, 400]
-- `WINDOW_COMPARISON['cycle_names']`: Custom names for comparison plots
+### Rolling Window Analysis Parameters
+Analysis configuration in `ROLLING_WINDOW_ANALYSIS` dictionary:
+- `'window_size'`: Rolling window size in kyr (default: 41)
+- `'min_periods'`: Minimum periods for correlation calculation (default: None = auto)
+- `'threshold_high'`: High correlation threshold (default: 0.7)
+- `'threshold_low'`: Decoupling threshold (default: 0.2)
+- `'window_comparison_sizes'`: Window sizes for comparison [20, 41, 100, 400]
+- `'cycle_names'`: Custom names for comparison plots
 
-### Spectral Analysis
-- `WAVELET_TYPE`: Type of wavelet ('morlet', 'paul', 'dog') (default: 'morlet')
-- `WAVELET_PARAM`: Wavelet parameter (default: 6 for Morlet)
-- `MIN_PERIOD`: Minimum period to analyze in kyr (default: 2.0)
-- `MAX_PERIOD`: Maximum period to analyze in kyr (default: 1000.0)
-- `COHERENCE_THRESHOLD`: Coherence threshold for significance (default: 0.7)
-- `CONFIDENCE_LEVEL`: Statistical confidence level (default: 0.95)
-- `MILANKOVITCH_CYCLES`: Dictionary defining orbital cycle periods
+Plot configuration in `ROLLING_WINDOW_PLOTS` dictionary:
+- `'comprehensive_figsize'`: Size for 4-subplot analysis (default: (16, 12))
+- `'temporal_evolution_figsize'`: Size for temporal evolution plots (default: (15, 8))
+- `'temporal_evolution_x_tick_interval'`: X-axis tick spacing in kyr (default: 40)
+- `'window_comparison_figsize'`: Size for window comparison plots (default: (16, 10))
 
-### Lead-Lag Analysis
-- `LEADLAG_ANALYSIS['max_lag_kyr']`: Maximum lag to test in both directions (default: 50)
-- `LEADLAG_ANALYSIS['lag_step_kyr']`: Step size for lag testing (default: 1.0)
-- `LEADLAG_ANALYSIS['methods']`: List of methods to compute:
+### Spectral Analysis Parameters
+Analysis configuration in `SPECTRAL_ANALYSIS` dictionary:
+- `'wavelet_type'`: Type of wavelet ('morlet', 'paul', 'dog') (default: 'morlet')
+- `'wavelet_param'`: Wavelet parameter (default: 6 for Morlet)
+- `'min_period'`: Minimum period to analyze in kyr (default: 2.0)
+- `'max_period'`: Maximum period to analyze in kyr (default: 1000.0)
+- `'coherence_threshold'`: Coherence threshold for significance (default: 0.7)
+- `'confidence_level'`: Statistical confidence level (default: 0.95)
+- `'milankovitch_cycles'`: Dictionary defining orbital cycle periods
+
+Plot configuration in `SPECTRAL_PLOTS` dictionary:
+- `'wavelet_power_figsize'`: Size for wavelet power plots (default: (16, 10))
+- `'wavelet_power_colormap'`: Colormap for power spectrum (default: 'jet')
+- `'cross_wavelet_figsize'`: Size for cross-wavelet analysis (default: (16, 12))
+- `'cross_wavelet_colormap'`: Colormap for cross-wavelet (default: 'RdBu_r')
+- `'global_spectrum_figsize'`: Size for global spectrum plots (default: (12, 8))
+- `'global_spectrum_show_milankovitch'`: Show Milankovitch cycle indicators (default: True)
+- `'global_spectrum_milankovitch_alpha'`: Transparency for Milankovitch indicators (default: 0.3)
+
+### Lead-Lag Analysis Parameters
+Analysis configuration in `LEADLAG_ANALYSIS` dictionary:
+- `'max_lag_kyr'`: Maximum lag to test in both directions (default: 50)
+- `'lag_step_kyr'`: Step size for lag testing (default: 1.0)
+- `'methods'`: List of methods to compute:
   - `'cross_correlation'`: Standard cross-correlation analysis
   - `'ccf_auc'`: Cross-correlation AUC (Area Under Curve) method
   - `'ccf_at_max_lag'`: Cross-correlation at maximum lag method
-- `LEADLAG_ANALYSIS['correlation_types']`: Types of correlation (default: ['pearson', 'spearman', 'kendall'])
-- `LEADLAG_ANALYSIS['significance_level']`: Statistical significance level (default: 0.05)
-- `LEADLAG_ANALYSIS['confidence_level']`: Confidence level for bootstrap intervals (default: 0.95)
-- `LEADLAG_ANALYSIS['bootstrap_iterations']`: Number of bootstrap iterations (default: 1000)
-- `LEADLAG_ANALYSIS['detrend_data']`: Whether to detrend data before analysis (default: True)
-- `LEADLAG_ANALYSIS['normalize_data']`: Whether to normalize data (z-score) (default: True)
+- `'correlation_types'`: Types of correlation (default: ['pearson', 'spearman', 'kendall'])
+- `'significance_level'`: Statistical significance level (default: 0.05)
+- `'confidence_level'`: Confidence level for bootstrap intervals (default: 0.95)
+- `'bootstrap_iterations'`: Number of bootstrap iterations (default: 1000)
+- `'detrend_data'`: Whether to detrend data before analysis (default: True)
+- `'normalize_data'`: Whether to normalize data (z-score) (default: True)
 
-### Plot Configurations
-- `COMPREHENSIVE_ANALYSIS['figsize']`: Size for rolling window 4-subplot analysis
-- `TEMPORAL_EVOLUTION['x_tick_interval']`: X-axis tick spacing in kyr
-- `WAVELET_POWER_PLOT['figsize']`: Size for wavelet power plots
-- `CROSS_WAVELET_PLOT['figsize']`: Size for cross-wavelet analysis
-- `GLOBAL_SPECTRUM_PLOT['figsize']`: Size for global spectrum plots
-- `LEADLAG_PLOTS['comprehensive_figsize']`: Size for comprehensive lead-lag analysis (default: (16, 10))
-- `LEADLAG_PLOTS['default_correlation_type']`: Default correlation type for plots (default: 'pearson')
-- `LEADLAG_PLOTS['contrast_line_color']`: Color for contrast line in plots (default: 'darkred')
+Plot configuration in `LEADLAG_PLOTS` dictionary:
+- `'comprehensive_figsize'`: Size for comprehensive lead-lag analysis (default: (16, 10))
+- `'methods_comparison_figsize'`: Size for methods comparison plots (default: (14, 10))
+- `'correlation_types_figsize'`: Size for correlation types plots (default: (14, 8))
+- `'confidence_intervals_figsize'`: Size for confidence interval plots (default: (12, 8))
+- `'colormap'`: Colormap for plots (default: 'RdBu_r')
+- `'default_correlation_type'`: Default correlation type for plots (default: 'pearson')
+- `'contrast_line_color'`: Color for contrast line in plots (default: 'darkred')
 
 ## Output Files
 
@@ -258,26 +271,15 @@ The system automatically validates configurations and shows warnings for:
 - Potentially problematic settings
 - Spectral analysis parameter consistency
 
-## Customization
-
-### Adding New Analysis Types
-Extend the existing analyzer classes or create new ones following the established patterns.
-
-### Custom Wavelets
-Modify `WAVELET_TYPE` and `WAVELET_PARAM` in configurations for different mother wavelets.
-
-### Different Time Scales
-Adjust `INTERPOLATION_RESOLUTION`, `MIN_PERIOD`, and `MAX_PERIOD` for your specific time scales.
-
 ## Understanding the Results
 
 ### Rolling Window Analysis Results
-1. **Comprehensive Analysis Plot**: Overview with time series, correlation evolution, distribution, and scatter plot
+1. **Analysis Plot**: Overview with time series, correlation evolution, distribution, and scatter plot
 2. **Temporal Evolution Plot**: Detailed view of correlation changes through time with colored periods
 3. **Window Comparison Plot**: How correlation patterns change with different window sizes
 
 ### Spectral Analysis Results
-1. **Comprehensive Wavelet Analysis (per proxy)**: Individual wavelet power spectra with reconstruction and global spectrum
+1. **Wavelet Analysis (per proxy)**: Individual wavelet power spectra with reconstruction and global spectrum
 2. **Cross-Wavelet Analysis**: Combined analysis showing cross-power, coherence, phase relationships, and global coherence
 3. **Global Wavelet Spectra**: Comparison of power spectra and coherence across all frequencies
 

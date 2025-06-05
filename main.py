@@ -62,7 +62,7 @@ def run_complete_analysis() -> None:
         rolling_analyzer.interpolate_to_common_grid()
         
         # Calculate rolling correlation
-        print(f"\n📊 CALCULATING ROLLING CORRELATION (window: {config.WINDOW_SIZE} kyr)...")
+        print(f"\n📊 CALCULATING ROLLING CORRELATION (window: {config.ROLLING_WINDOW_ANALYSIS['window_size']} kyr)...")
         rolling_analyzer.calculate_rolling_correlation()
         
         # Identify periods
@@ -86,10 +86,10 @@ def run_complete_analysis() -> None:
         
         rolling_analyzer.export_results('rolling_correlation_results.csv')
         
-        rolling_pdf = rolling_analyzer.create_pdf_report(config.WINDOW_SIZE, periods)
+        rolling_pdf = rolling_analyzer.create_pdf_report(config.ROLLING_WINDOW_ANALYSIS['window_size'], periods)
         print(f"✅ Rolling window PDF report: {rolling_pdf}")
         
-        rolling_json = rolling_analyzer.create_json_metadata(config.WINDOW_SIZE, periods)
+        rolling_json = rolling_analyzer.create_json_metadata(config.ROLLING_WINDOW_ANALYSIS['window_size'], periods)
         print(f"✅ Rolling window metadata JSON: {rolling_json}")
         
         # Rolling window summary
@@ -120,7 +120,7 @@ def run_complete_analysis() -> None:
         spectral_analyzer.interpolate_to_common_grid()
         
         # Wavelet analysis
-        print(f"\n🌊 WAVELET ANALYSIS ({config.WAVELET_TYPE} wavelet)...")
+        print(f"\n🌊 WAVELET ANALYSIS ({config.SPECTRAL_ANALYSIS['wavelet_type']} wavelet)...")
         spectral_analyzer.calculate_wavelet_transform()
         
         # Identify Milankovitch cycles

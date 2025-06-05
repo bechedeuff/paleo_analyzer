@@ -30,37 +30,37 @@ def validate_configurations() -> List[str]:
         warnings.append(f"⚠️  Proxy 2 file not found: {proxy2_path}")
     
     # Check window size
-    if config.WINDOW_SIZE < 5:
-        warnings.append(f"⚠️  Small window size ({config.WINDOW_SIZE} kyr) may generate unstable results")
-    elif config.WINDOW_SIZE > 500:
-        warnings.append(f"⚠️  Large window size ({config.WINDOW_SIZE} kyr) may lose temporal details")
+    if config.ROLLING_WINDOW_ANALYSIS['window_size'] < 5:
+        warnings.append(f"⚠️  Small window size ({config.ROLLING_WINDOW_ANALYSIS['window_size']} kyr) may generate unstable results")
+    elif config.ROLLING_WINDOW_ANALYSIS['window_size'] > 500:
+        warnings.append(f"⚠️  Large window size ({config.ROLLING_WINDOW_ANALYSIS['window_size']} kyr) may lose temporal details")
     
     # Check thresholds
-    if not (0 < config.THRESHOLD_HIGH <= 1):
-        warnings.append(f"⚠️  THRESHOLD_HIGH should be between 0 and 1 (current: {config.THRESHOLD_HIGH})")
+    if not (0 < config.ROLLING_WINDOW_ANALYSIS['threshold_high'] <= 1):
+        warnings.append(f"⚠️  THRESHOLD_HIGH should be between 0 and 1 (current: {config.ROLLING_WINDOW_ANALYSIS['threshold_high']})")
     
-    if not (0 < config.THRESHOLD_LOW < config.THRESHOLD_HIGH):
-        warnings.append(f"⚠️  THRESHOLD_LOW should be between 0 and THRESHOLD_HIGH (current: {config.THRESHOLD_LOW})")
+    if not (0 < config.ROLLING_WINDOW_ANALYSIS['threshold_low'] < config.ROLLING_WINDOW_ANALYSIS['threshold_high']):
+        warnings.append(f"⚠️  THRESHOLD_LOW should be between 0 and THRESHOLD_HIGH (current: {config.ROLLING_WINDOW_ANALYSIS['threshold_low']})")
     
     # Check window comparison sizes
-    if len(config.WINDOW_COMPARISON['window_sizes']) != len(config.WINDOW_COMPARISON['cycle_names']):
+    if len(config.ROLLING_WINDOW_ANALYSIS['window_comparison_sizes']) != len(config.ROLLING_WINDOW_ANALYSIS['cycle_names']):
         warnings.append(f"⚠️  Number of window_sizes and cycle_names should match")
     
     # Check spectral analysis parameters
-    if config.MIN_PERIOD <= 0:
-        warnings.append(f"⚠️  MIN_PERIOD should be positive (current: {config.MIN_PERIOD})")
+    if config.SPECTRAL_ANALYSIS['min_period'] <= 0:
+        warnings.append(f"⚠️  MIN_PERIOD should be positive (current: {config.SPECTRAL_ANALYSIS['min_period']})")
     
-    if config.MAX_PERIOD <= config.MIN_PERIOD:
+    if config.SPECTRAL_ANALYSIS['max_period'] <= config.SPECTRAL_ANALYSIS['min_period']:
         warnings.append(f"⚠️  MAX_PERIOD should be greater than MIN_PERIOD")
     
-    if not (0 < config.COHERENCE_THRESHOLD <= 1):
-        warnings.append(f"⚠️  COHERENCE_THRESHOLD should be between 0 and 1 (current: {config.COHERENCE_THRESHOLD})")
+    if not (0 < config.SPECTRAL_ANALYSIS['coherence_threshold'] <= 1):
+        warnings.append(f"⚠️  COHERENCE_THRESHOLD should be between 0 and 1 (current: {config.SPECTRAL_ANALYSIS['coherence_threshold']})")
     
-    if not (0 < config.CONFIDENCE_LEVEL < 1):
-        warnings.append(f"⚠️  CONFIDENCE_LEVEL should be between 0 and 1 (current: {config.CONFIDENCE_LEVEL})")
+    if not (0 < config.SPECTRAL_ANALYSIS['confidence_level'] < 1):
+        warnings.append(f"⚠️  CONFIDENCE_LEVEL should be between 0 and 1 (current: {config.SPECTRAL_ANALYSIS['confidence_level']})")
     
-    if config.WAVELET_PARAM <= 0:
-        warnings.append(f"⚠️  WAVELET_PARAM should be positive (current: {config.WAVELET_PARAM})")
+    if config.SPECTRAL_ANALYSIS['wavelet_param'] <= 0:
+        warnings.append(f"⚠️  WAVELET_PARAM should be positive (current: {config.SPECTRAL_ANALYSIS['wavelet_param']})")
     
     return warnings
 
@@ -74,17 +74,24 @@ def print_configuration_summary() -> None:
     print("DATA FILES:")
     print(f"  Proxy 1 file: {config.PROXY1_FILE}")
     print(f"  Proxy 2 file: {config.PROXY2_FILE}")
-    print("\nROLLING WINDOW ANALYSIS:")
-    print(f"  Window size: {config.WINDOW_SIZE} kyr")
     print(f"  Interpolation resolution: {config.INTERPOLATION_RESOLUTION} kyr")
-    print(f"  Correlation thresholds: High={config.THRESHOLD_HIGH}, Low={config.THRESHOLD_LOW}")
-    print(f"  Window comparison sizes: {config.WINDOW_COMPARISON['window_sizes']} kyr")
+    print()
+    print("\nROLLING WINDOW ANALYSIS:")
+    print(f"  Window size: {config.ROLLING_WINDOW_ANALYSIS['window_size']} kyr")
+    print(f"  Correlation thresholds: High={config.ROLLING_WINDOW_ANALYSIS['threshold_high']}, Low={config.ROLLING_WINDOW_ANALYSIS['threshold_low']}")
+    print(f"  Window comparison sizes: {config.ROLLING_WINDOW_ANALYSIS['window_comparison_sizes']} kyr")
     print("\nSPECTRAL ANALYSIS:")
-    print(f"  Wavelet type: {config.WAVELET_TYPE} (param={config.WAVELET_PARAM})")
-    print(f"  Period range: {config.MIN_PERIOD} - {config.MAX_PERIOD} kyr")
-    print(f"  Coherence threshold: {config.COHERENCE_THRESHOLD}")
-    print(f"  Confidence level: {config.CONFIDENCE_LEVEL}")
-    print(f"  Milankovitch cycles: {list(config.MILANKOVITCH_CYCLES.keys())}")
+    print(f"  Wavelet type: {config.SPECTRAL_ANALYSIS['wavelet_type']} (param={config.SPECTRAL_ANALYSIS['wavelet_param']})")
+    print(f"  Period range: {config.SPECTRAL_ANALYSIS['min_period']} - {config.SPECTRAL_ANALYSIS['max_period']} kyr")
+    print(f"  Coherence threshold: {config.SPECTRAL_ANALYSIS['coherence_threshold']}")
+    print(f"  Confidence level: {config.SPECTRAL_ANALYSIS['confidence_level']}")
+    print(f"  Milankovitch cycles: {list(config.SPECTRAL_ANALYSIS['milankovitch_cycles'].keys())}")
+    print("\nLEAD-LAG ANALYSIS:")
+    print(f"  Max lag: {config.LEADLAG_ANALYSIS['max_lag_kyr']} kyr")
+    print(f"  Lag step: {config.LEADLAG_ANALYSIS['lag_step_kyr']} kyr")
+    print(f"  Methods: {config.LEADLAG_ANALYSIS['methods']}")
+    print(f"  Correlation types: {config.LEADLAG_ANALYSIS['correlation_types']}")
+    print(f"  Bootstrap iterations: {config.LEADLAG_ANALYSIS['bootstrap_iterations']}")
     print()
 
 
@@ -157,42 +164,18 @@ def save_experiment_config(experiment_dir: str) -> str:
             "proxy1_file": config.PROXY1_FILE,
             "proxy2_file": config.PROXY2_FILE
         },
-        "analysis_parameters": {
-            "window_size": config.WINDOW_SIZE,
-            "interpolation_resolution": config.INTERPOLATION_RESOLUTION,
-            "min_periods": config.MIN_PERIODS,
-            "threshold_high": config.THRESHOLD_HIGH,
-            "threshold_low": config.THRESHOLD_LOW
-        },
+        "rolling_window_analysis": config.ROLLING_WINDOW_ANALYSIS,
         "visualization_settings": {
             "matplotlib_style": config.MATPLOTLIB_STYLE,
             "seaborn_palette": config.SEABORN_PALETTE,
             "default_figure_size": config.DEFAULT_FIGURE_SIZE,
             "default_font_size": config.DEFAULT_FONT_SIZE
         },
-        "plot_configurations": {
-            "comprehensive_analysis": config.COMPREHENSIVE_ANALYSIS,
-            "temporal_evolution": config.TEMPORAL_EVOLUTION,
-            "window_comparison": config.WINDOW_COMPARISON
-        },
-        "spectral_analysis": {
-            "wavelet_type": config.WAVELET_TYPE,
-            "wavelet_param": config.WAVELET_PARAM,
-            "min_period": config.MIN_PERIOD,
-            "max_period": config.MAX_PERIOD,
-            "coherence_threshold": config.COHERENCE_THRESHOLD,
-            "confidence_level": config.CONFIDENCE_LEVEL,
-            "milankovitch_cycles": config.MILANKOVITCH_CYCLES
-        },
-        "spectral_plot_configurations": {
-            "wavelet_power_plot": config.WAVELET_POWER_PLOT,
-            "cross_wavelet_plot": config.CROSS_WAVELET_PLOT,
-            "global_spectrum_plot": config.GLOBAL_SPECTRUM_PLOT
-        },
-        "lead_lag_analysis": {
-            "leadlag_analysis": config.LEADLAG_ANALYSIS,
-            "leadlag_plots": config.LEADLAG_PLOTS
-        }
+        "rolling_window_plots": config.ROLLING_WINDOW_PLOTS,
+        "spectral_analysis": config.SPECTRAL_ANALYSIS,
+        "spectral_plots": config.SPECTRAL_PLOTS,
+        "leadlag_analysis": config.LEADLAG_ANALYSIS,
+        "leadlag_plots": config.LEADLAG_PLOTS
     }
     
     config_file: str = f'{experiment_dir}/experiment_config.json'

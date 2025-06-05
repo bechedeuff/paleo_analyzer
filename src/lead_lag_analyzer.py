@@ -716,7 +716,7 @@ class PaleoclimateLead_LagAnalyzer:
         
         # Save figure
         filename = f'{self.experiment_dir}/figures/leadlag_analysis.png'
-        plt.savefig(filename, dpi=config.LEADLAG_PLOTS['dpi'], bbox_inches='tight')
+        plt.savefig(filename, dpi=config.DEFAULT_DPI, bbox_inches='tight')
         plt.close()
         print(f"✅ Lead-lag plot saved: {filename}")
     
