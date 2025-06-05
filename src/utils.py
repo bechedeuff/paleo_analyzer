@@ -119,10 +119,16 @@ def create_results_directory() -> str:
     os.makedirs(f'{experiment_dir}/spectral', exist_ok=True)
     os.makedirs(f'{experiment_dir}/spectral/figures', exist_ok=True)
     
+    # Lead-lag analysis subdirectories
+    os.makedirs(f'{experiment_dir}/lead_lag', exist_ok=True)
+    os.makedirs(f'{experiment_dir}/lead_lag/figures', exist_ok=True)
+    
     print(f"📁 Created experiment directory: {experiment_dir}")
     print(f"   ├── rolling_window/")
     print(f"   │   └── figures/")
     print(f"   ├── spectral/")
+    print(f"   │   └── figures/")
+    print(f"   ├── lead_lag/")
     print(f"   │   └── figures/")
     print(f"   └── experiment_config.json (will be created)")
     return experiment_dir
@@ -182,6 +188,10 @@ def save_experiment_config(experiment_dir: str) -> str:
             "wavelet_power_plot": config.WAVELET_POWER_PLOT,
             "cross_wavelet_plot": config.CROSS_WAVELET_PLOT,
             "global_spectrum_plot": config.GLOBAL_SPECTRUM_PLOT
+        },
+        "lead_lag_analysis": {
+            "leadlag_analysis": config.LEADLAG_ANALYSIS,
+            "leadlag_plots": config.LEADLAG_PLOTS
         }
     }
     
