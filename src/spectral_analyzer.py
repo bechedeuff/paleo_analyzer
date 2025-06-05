@@ -615,7 +615,7 @@ class PaleoclimateSpectralAnalyzer:
         plt.tight_layout()
         
         # Save figure
-        filename = f'{self.experiment_dir}/figures/comprehensive_wavelet_analysis_proxy{proxy_num}.png'
+        filename = f'{self.experiment_dir}/figures/wavelet_analysis_proxy{proxy_num}.png'
         plt.savefig(filename, dpi=config.DEFAULT_DPI, bbox_inches='tight')
         plt.close()
         print(f"✅ Comprehensive wavelet analysis saved: {filename}")
