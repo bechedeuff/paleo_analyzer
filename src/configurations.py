@@ -9,7 +9,7 @@ PROXY1_FILE = "d13C_age_cibicides.csv"
 PROXY2_FILE = "lnmn-sue-TD-age.csv"
 
 # =============================================================================
-# VISUALIZATION CONFIGURATION
+# GENERAL VISUALIZATION CONFIGURATIONS
 # =============================================================================
 
 # Matplotlib and Seaborn styling
@@ -114,4 +114,41 @@ GLOBAL_SPECTRUM_PLOT = {
     'figsize': (12, 8),
     'show_milankovitch': True,
     'milankovitch_alpha': 0.3
+}
+
+# =============================================================================
+# LEAD-LAG ANALYSIS PARAMETERS
+# =============================================================================
+
+# Lead-Lag Analysis Configuration
+LEADLAG_ANALYSIS = {
+    'max_lag_kyr': 50,           # Maximum lag to test in both directions (kyr)
+    'lag_step_kyr': 1.0,         # Step size for lag testing (kyr)  
+    'methods': [                 # List of methods to compute
+        'cross_correlation',      # Standard cross-correlation
+        'ccf_auc',               # Cross-correlation AUC method
+        'ccf_at_max_lag'         # Cross-correlation at maximum lag
+    ],
+    'correlation_types': [       # Types of correlation to test
+        'pearson',               # Pearson correlation
+        'spearman',              # Spearman rank correlation
+        'kendall'                # Kendall tau correlation
+    ],
+    'significance_level': 0.05,  # Statistical significance level
+    'confidence_level': 0.95,    # Confidence level for intervals
+    'bootstrap_iterations': 1000, # Number of bootstrap iterations for confidence intervals
+    'detrend_data': True,        # Whether to detrend data before analysis
+    'normalize_data': True       # Whether to normalize data (z-score)
+}
+
+# Lead-Lag Plots Configuration
+LEADLAG_PLOTS = {
+    'comprehensive_figsize': (16, 10),
+    'methods_comparison_figsize': (14, 10),
+    'correlation_types_figsize': (14, 8),
+    'confidence_intervals_figsize': (12, 8),
+    'colormap': 'RdBu_r',
+    'dpi': 300,
+    'default_correlation_type': 'pearson',  # Default correlation type for contrast plot
+    'contrast_line_color': 'darkred'        # Color for contrast line (avoid blue)
 }
