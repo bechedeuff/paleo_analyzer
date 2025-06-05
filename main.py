@@ -2,6 +2,7 @@ import os
 from src.utils import create_results_directory, save_experiment_config, print_configuration_summary, validate_configurations
 from src.rolling_window_analyzer import PaleoclimateCorrelationAnalyzer
 from src.spectral_analyzer import PaleoclimateSpectralAnalyzer
+from src.lead_lag_analyzer import PaleoclimateLead_LagAnalyzer
 from src import configurations as config
 import numpy as np
 
@@ -161,26 +162,65 @@ def run_complete_analysis() -> None:
         print(f"   Mean coherence: {mean_coherence:.3f}")
         
         # =============================================================================
-        # FINAL SUMMARY
+        # LEAD-LAG ANALYSIS
         # =============================================================================
         
         print("\n" + "="*70)
-        print("🏁 COMPREHENSIVE ANALYSIS COMPLETED!")
+        print("🔄 LEAD-LAG ANALYSIS")
         print("="*70)
-        print(f"📁 Results directory: {experiment_dir}")
-        print(f"   ├── rolling_window/")
-        print(f"   │   ├── figures/ ({len(os.listdir(f'{experiment_dir}/rolling_window/figures'))} files)")
-        print(f"   │   ├── rolling_correlation_results.csv")
-        print(f"   │   ├── correlation_analysis_report.pdf")
-        print(f"   │   └── analysis_metadata.json")
-        print(f"   ├── spectral/")
-        print(f"   │   ├── figures/ ({len(os.listdir(f'{experiment_dir}/spectral/figures'))} files)")
-        print(f"   │   ├── spectral_analysis_results.csv")
-        print(f"   │   ├── spectral_analysis_report.pdf")
-        print(f"   │   └── spectral_analysis_metadata.json")
-        print(f"   └── experiment_config.json")
-        print("\n🎯 Both analyses completed successfully!")
-        print("📊 Check the generated reports and figures for detailed results.")
+        
+        # Initialize lead-lag analyzer with specific subdirectory
+        leadlag_analyzer = PaleoclimateLead_LagAnalyzer(f'{experiment_dir}/lead_lag')
+        
+        # Data loading (reuse same files)
+        print("\n📂 LOADING DATA FOR LEAD-LAG ANALYSIS...")
+        if not leadlag_analyzer.load_data(proxy1_file, proxy2_file):
+            print("❌ Error in data loading for lead-lag analysis!")
+            return
+        
+        # Data processing
+        print("\n🔧 PROCESSING DATA FOR LEAD-LAG ANALYSIS...")
+        leadlag_analyzer.interpolate_to_common_grid()
+        
+        # Lead-lag analysis
+        print(f"\n🔄 LEAD-LAG ANALYSIS (max lag: {config.LEADLAG_ANALYSIS['max_lag_kyr']} kyr)...")
+        leadlag_results = leadlag_analyzer.calculate_comprehensive_leadlag_analysis()
+        
+        # Generate lead-lag visualizations
+        print("\n📈 GENERATING LEAD-LAG VISUALIZATIONS...")
+        
+        print("   • Comprehensive lead-lag analysis...")
+        leadlag_analyzer.plot_comprehensive_leadlag_analysis()
+        
+        # Export lead-lag results
+        print("\n💾 EXPORTING LEAD-LAG RESULTS...")
+        
+        leadlag_analyzer.export_results('leadlag_analysis_results.csv')
+        
+        leadlag_pdf = leadlag_analyzer.create_pdf_report()
+        print(f"✅ Lead-lag analysis PDF report: {leadlag_pdf}")
+        
+        leadlag_json = leadlag_analyzer.create_json_metadata()
+        print(f"✅ Lead-lag analysis metadata JSON: {leadlag_json}")
+        
+        # Lead-lag summary
+        methods_summary = []
+        for method, method_data in leadlag_results['summary'].items():
+            if 'pearson' in method_data:
+                if method == 'cross_correlation':
+                    lag = method_data['pearson']['optimal_lag_kyr']
+                    corr = method_data['pearson']['optimal_correlation']
+                    methods_summary.append(f"{method}: lag={lag:.1f} kyr, r={corr:.3f}")
+                elif method == 'ccf_auc':
+                    auc = method_data['pearson']['auc_measure']
+                    methods_summary.append(f"{method}: AUC={auc:.3f}")
+                    
+        print(f"\n🔄 LEAD-LAG SUMMARY:")
+        print(f"   Methods analyzed: {len(leadlag_results['analysis_info']['methods'])}")
+        print(f"   Correlation types: {len(leadlag_results['analysis_info']['correlation_types'])}")
+        for summary in methods_summary:
+            print(f"   {summary}")
+        
         
     except ImportError as e:
         print(f"❌ Error importing modules: {e}")
