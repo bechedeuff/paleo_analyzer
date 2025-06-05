@@ -3,20 +3,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.interpolate import interp1d
+
 from scipy.stats import bootstrap
 import warnings
-import json
-from datetime import datetime
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib import colors
 
 # Import configurations
 from . import configurations as config
-from .utils import load_paleoclimate_data
 
 warnings.filterwarnings('ignore')
 
@@ -52,80 +44,6 @@ class PaleoclimateLead_LagAnalyzer:
         self.interpolated_data: Optional[pd.DataFrame] = None
         self.leadlag_results: Optional[Dict[str, Any]] = None
         self.experiment_dir: str = experiment_dir or 'results'
-        
-    def load_data(self, proxy1_file: str, proxy2_file: str) -> bool:
-        """
-        Load paleoclimate data from CSV files using common utility function
-        
-        Parameters:
-        -----------
-        proxy1_file : str
-            Path to CSV file of the first proxy
-        proxy2_file : str
-            Path to CSV file of the second proxy
-            
-        Returns:
-        --------
-        bool : True if loading successful, False otherwise
-        """
-        success, data = load_paleoclimate_data(proxy1_file, proxy2_file)
-        
-        if success and data:
-            # Set instance attributes from loaded data
-            self.proxy1_data = data['proxy1_data']
-            self.proxy2_data = data['proxy2_data']
-            self.proxy1_name = data['proxy1_name']
-            self.proxy2_name = data['proxy2_name']
-            self.proxy1_units = data['proxy1_units']
-            self.proxy2_units = data['proxy2_units']
-            return True
-        else:
-            return False
-            
-    def interpolate_to_common_grid(self, resolution: float = config.INTERPOLATION_RESOLUTION) -> None:
-        """
-        Interpolate both series to a common temporal grid
-        
-        Parameters:
-        -----------
-        resolution : float
-            Temporal resolution in kyr (default: 1.0)
-        """
-        print(f"\n🔄 Interpolating to common grid (resolution: {resolution} kyr)...")
-        
-        # Defining common temporal range (overlap)
-        min_age = max(self.proxy1_data['age_kyr'].min(), self.proxy2_data['age_kyr'].min())
-        max_age = min(self.proxy1_data['age_kyr'].max(), self.proxy2_data['age_kyr'].max())
-        
-        # Creating uniform temporal grid
-        common_ages = np.arange(min_age, max_age + resolution, resolution)
-        
-        # Linear interpolation for both proxies
-        interp_proxy1 = interp1d(
-            self.proxy1_data['age_kyr'], 
-            self.proxy1_data['proxy1_values'],
-            kind='linear',
-            bounds_error=False,
-            fill_value=np.nan
-        )
-        
-        interp_proxy2 = interp1d(
-            self.proxy2_data['age_kyr'],
-            self.proxy2_data['proxy2_values'],
-            kind='linear',
-            bounds_error=False,
-            fill_value=np.nan
-        )
-        
-        # Creating DataFrame with interpolated data
-        self.interpolated_data = pd.DataFrame({
-            'age_kyr': common_ages,
-            'proxy1_values': interp_proxy1(common_ages),
-            'proxy2_values': interp_proxy2(common_ages)
-        }).dropna().reset_index(drop=True)
-        
-        print(f"✅ Interpolation completed: {len(self.interpolated_data)} points")
-        print(f"   Final range: {self.interpolated_data['age_kyr'].min():.1f} - {self.interpolated_data['age_kyr'].max():.1f} kyr")
         
     def preprocess_data(self, detrend: bool = config.LEADLAG_ANALYSIS['detrend_data'],
                         normalize: bool = config.LEADLAG_ANALYSIS['normalize_data']) -> Tuple[np.ndarray, np.ndarray]:
@@ -509,7 +427,7 @@ class PaleoclimateLead_LagAnalyzer:
             ccf_auc_results = {}
             for corr_type in correlation_types:
                 auc_measure = self.ccf_auc_method(proxy1_processed, proxy2_processed, 
-                                                 max_lag_steps, corr_type)
+                                                    max_lag_steps, corr_type)
                 
                 # Bootstrap confidence intervals
                 lower_ci, upper_ci = self.bootstrap_confidence_intervals(
@@ -657,8 +575,8 @@ class PaleoclimateLead_LagAnalyzer:
                         self.interpolated_data['proxy1_values'], 
                         'b-', linewidth=2, alpha=0.8, label=proxy1_label)
         line2 = ax1_twin.plot(self.interpolated_data['age_kyr'], 
-                             self.interpolated_data['proxy2_values'], 
-                             'r-', linewidth=2, alpha=0.8, label=proxy2_label)
+                                self.interpolated_data['proxy2_values'], 
+                                'r-', linewidth=2, alpha=0.8, label=proxy2_label)
         
         ax1.set_xlabel('Age (kyr ago)')
         ax1.set_ylabel(f'{self.proxy1_name}', color='blue')
@@ -719,227 +637,3 @@ class PaleoclimateLead_LagAnalyzer:
         plt.savefig(filename, dpi=config.DEFAULT_DPI, bbox_inches='tight')
         plt.close()
         print(f"✅ Lead-lag plot saved: {filename}")
-    
-    def export_results(self, filename: str = 'leadlag_analysis_results.csv') -> None:
-        """
-        Export results to CSV file
-        
-        Parameters:
-        -----------
-        filename : str
-            Name of the file to export
-        """
-        if self.leadlag_results is None:
-            raise ValueError("Execute calculate_comprehensive_leadlag_analysis() first!")
-            
-        # Create full path with experiment directory
-        full_path = f'{self.experiment_dir}/{filename}'
-        
-        # Export cross-correlation results if available
-        if 'cross_correlation' in self.leadlag_results['detailed_results']:
-            cross_corr_data = self.leadlag_results['detailed_results']['cross_correlation']
-            
-            # Create export DataFrame
-            export_data = []
-            for corr_type, data in cross_corr_data.items():
-                lags = data['lags_kyr']
-                correlations = data['correlations']
-                
-                for lag, corr in zip(lags, correlations):
-                    export_data.append({
-                        'lag_kyr': lag,
-                        'correlation_type': corr_type,
-                        'correlation_value': round(float(corr), 3)
-                    })
-            
-            export_df = pd.DataFrame(export_data)
-            export_df.to_csv(full_path, index=False, sep=';', decimal=',')
-            print(f"✅ Results exported to: {full_path}")
-        else:
-            print("⚠️ No cross-correlation data available for export")
-    
-    def create_json_metadata(self) -> str:
-        """
-        Create a JSON file with lead-lag analysis metadata
-        
-        Returns:
-        --------
-        str
-            Path to the generated JSON file
-        """
-        if self.leadlag_results is None:
-            raise ValueError("Execute calculate_comprehensive_leadlag_analysis() first!")
-            
-        # Prepare JSON-serializable data
-        metadata = {
-            "analysis_info": {
-                "date": datetime.now().strftime('%Y-%m-%d %H:%M'),
-                "analysis_type": "lead_lag",
-                "proxy1_name": self.proxy1_name,
-                "proxy2_name": self.proxy2_name
-            },
-            "data_summary": {
-                "total_points": len(self.interpolated_data),
-                "age_range_kyr": {
-                    "min": float(self.interpolated_data['age_kyr'].min()),
-                    "max": float(self.interpolated_data['age_kyr'].max())
-                }
-            },
-            "analysis_parameters": self.leadlag_results['analysis_info'],
-            "summary_results": {},
-            "configuration_used": {
-                key: config.LEADLAG_ANALYSIS[key] 
-                for key in config.LEADLAG_ANALYSIS 
-                if isinstance(config.LEADLAG_ANALYSIS[key], (int, float, bool, str, list))
-            }
-        }
-        
-        # Add summary results (converting numpy types to Python types)
-        for method, method_data in self.leadlag_results['summary'].items():
-            metadata["summary_results"][method] = {}
-            for corr_type, results in method_data.items():
-                metadata["summary_results"][method][corr_type] = {}
-                for key, value in results.items():
-                    if isinstance(value, (np.integer, np.floating)):
-                        metadata["summary_results"][method][corr_type][key] = round(float(value), 3)
-                    else:
-                        metadata["summary_results"][method][corr_type][key] = value
-        
-        # Save JSON
-        json_file = f'{self.experiment_dir}/leadlag_analysis_metadata.json'
-        with open(json_file, 'w', encoding='utf-8') as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
-        
-        return json_file
-    
-    def create_pdf_report(self) -> str:
-        """
-        Create a well-formatted PDF report
-        
-        Returns:
-        --------
-        str
-            Path to the generated PDF file
-        """
-        if self.leadlag_results is None:
-            raise ValueError("Execute calculate_comprehensive_leadlag_analysis() first!")
-            
-        # PDF configuration
-        pdf_file = f'{self.experiment_dir}/leadlag_analysis_report.pdf'
-        doc = SimpleDocTemplate(pdf_file, pagesize=A4)
-        styles = getSampleStyleSheet()
-        story = []
-        
-        # Custom styles
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            spaceAfter=30,
-            alignment=1,
-            textColor=colors.black
-        )
-        
-        section_style = ParagraphStyle(
-            'SectionHeader',
-            parent=styles['Heading2'],
-            fontSize=12,
-            spaceAfter=12,
-            textColor=colors.black
-        )
-        
-        # Title
-        story.append(Paragraph("LEAD-LAG ANALYSIS REPORT", title_style))
-        story.append(Spacer(1, 20))
-        
-        # General information
-        analysis_date = datetime.now().strftime('%Y-%m-%d %H:%M')
-        info_data = [
-            ['Analysis date:', analysis_date],
-            ['Proxy 1:', self.proxy1_name],
-            ['Proxy 2:', self.proxy2_name],
-            ['Analysis methods:', ', '.join(self.leadlag_results['analysis_info']['methods'])],
-            ['Correlation types:', ', '.join(self.leadlag_results['analysis_info']['correlation_types'])],
-            ['Max lag tested:', f"{self.leadlag_results['analysis_info']['max_lag_kyr']} kyr"],
-            ['Total data points:', str(len(self.interpolated_data))]
-        ]
-        
-        info_table = Table(info_data, colWidths=[2*inch, 3*inch])
-        info_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey)
-        ]))
-        story.append(info_table)
-        story.append(Spacer(1, 20))
-        
-        # Results summary
-        story.append(Paragraph("RESULTS SUMMARY", section_style))
-        
-        for method, method_data in self.leadlag_results['summary'].items():
-            story.append(Paragraph(f"{method.replace('_', ' ').title()}", section_style))
-            
-            results_data = [['Correlation Type', 'Key Result', 'Value']]
-            for corr_type, results in method_data.items():
-                if method == 'cross_correlation':
-                    results_data.append([
-                        corr_type.capitalize(),
-                        'Optimal lag (kyr)',
-                        f"{results['optimal_lag_kyr']:.2f}"
-                    ])
-                    results_data.append([
-                        '',
-                        'Max correlation',
-                        f"{results['optimal_correlation']:.3f}"
-                    ])
-                elif method == 'ccf_auc':
-                    results_data.append([
-                        corr_type.capitalize(),
-                        'AUC measure',
-                        f"{results['auc_measure']:.3f}"
-                    ])
-                    results_data.append([
-                        '',
-                        'Interpretation',
-                        results['interpretation']
-                    ])
-                elif method == 'ccf_at_max_lag':
-                    results_data.append([
-                        corr_type.capitalize(),
-                        'Optimal lag (kyr)',
-                        f"{results['optimal_lag_kyr']:.2f}"
-                    ])
-                    results_data.append([
-                        '',
-                        'Max correlation',
-                        f"{results['max_correlation']:.3f}"
-                    ])
-            
-            results_table = Table(results_data, colWidths=[1.5*inch, 2*inch, 2*inch])
-            results_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue)
-            ]))
-            story.append(results_table)
-            story.append(Spacer(1, 15))
-        
-        # Methodology explanation
-        story.append(Paragraph("METHODOLOGY", section_style))
-        methodology_text = """
-        <b>• Cross-correlation:</b> Standard cross-correlation function computed at various lags<br/><br/>
-        <b>• CCF AUC:</b> Area under curve method comparing positive vs negative lag regions<br/><br/>
-        <b>• CCF at Max Lag:</b> Cross-correlation value at the lag with maximum absolute correlation<br/><br/>
-        <b>• Correlation Types:</b> Pearson (linear), Spearman (rank), Kendall (tau)
-        """
-        story.append(Paragraph(methodology_text, styles['Normal']))
-        
-        # Generate PDF
-        doc.build(story)
-        return pdf_file 
